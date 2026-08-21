@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nós — Gestor de Links</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="grid-backdrop" aria-hidden="true"></div>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-mark">◈</span>
+    <div class="brand-text">
+      <h1>Nós</h1>
+      <p class="brand-sub">catálogo pessoal de endereços</p>
+    </div>
+  </div>
+
+  <div class="file-controls">
+    <span class="file-status" id="fileStatus" data-state="connected">
+      <span class="status-dot"></span>
+      <span class="status-label">Ligado ao servidor</span>
+    </span>
+    <div class="file-buttons">
+      <button class="btn btn-ghost" id="btnToggleTheme" title="Alternar tema">🌗</button>
+      <button class="btn btn-ghost" id="btnExport" title="Descarregar cópia como links.json">Exportar .json</button>
+    </div>
+  </div>
+</header>
+
+<main class="layout">
+
+  <section class="composer" aria-labelledby="composerTitle">
+    <h2 id="composerTitle" class="section-eyebrow">01 — Adicionar nó</h2>
+
+    <form id="linkForm" class="link-form" autocomplete="off">
+      <input type="hidden" id="editingId">
+
+      <div class="field field-url">
+        <label for="inputUrl">Endereço (URL)</label>
+        <input type="url" id="inputUrl" name="url" placeholder="https://exemplo.com/pagina" required>
+      </div>
+
+      <div class="field">
+        <label for="inputTitle">Título</label>
+        <input type="text" id="inputTitle" name="title" placeholder="Nome a apresentar" required>
+      </div>
+
+      <div class="field">
+        <label for="inputTags">Etiquetas</label>
+        <input type="text" id="inputTags" name="tags" placeholder="trabalho, leitura, ferramenta (separadas por vírgula)">
+      </div>
+
+      <div class="field field-notes">
+        <label for="inputNotes">Notas</label>
+        <textarea id="inputNotes" name="notes" rows="2" placeholder="Contexto opcional…"></textarea>
+      </div>
+
+      <div class="field field-favorite">
+        <label class="checkbox-row" for="inputFavorite">
+          <input type="checkbox" id="inputFavorite" name="favorite">
+          <span>Marcar como favorito</span>
+        </label>
+      </div>
+
+      <p class="form-error hidden" id="formError"></p>
+
+      <button type="submit" class="btn btn-primary btn-add" id="btnSubmit">Guardar nó</button>
+      <button type="button" class="btn btn-ghost btn-cancel-edit hidden" id="btnCancelEdit">Cancelar edição</button>
+    </form>
+  </section>
+
+  <section class="collection" aria-labelledby="collectionTitle">
+    <div class="collection-header">
+      <h2 id="collectionTitle" class="section-eyebrow">02 — Coleção</h2>
+
+      <div class="toolbar">
+        <input type="search" id="searchInput" class="search-input" placeholder="Pesquisar título, URL, etiqueta ou nota…">
+
+        <div class="filter-tags" id="filterTags" role="group" aria-label="Filtrar por etiqueta"></div>
+
+        <div class="sort-control">
+          <label for="sortSelect">Ordenar</label>
+          <select id="sortSelect">
+            <option value="recent">Mais recentes</option>
+            <option value="oldest">Mais antigos</option>
+            <option value="az">Título A–Z</option>
+            <option value="za">Título Z–A</option>
+            <option value="favorites">Favoritos primeiro</option>
+          </select>
+        </div>
+
+        <button class="btn btn-ghost" id="btnToggleView" title="Alternar entre lista e grelha">⊞</button>
+      </div>
+    </div>
+
+    <p class="count-line" id="countLine">0 nós guardados</p>
+
+    <ul class="link-list" id="linkList"></ul>
+
+    <div class="empty-state" id="emptyState">
+      <span class="empty-mark">◇</span>
+      <p>Ainda não há nós na coleção.</p>
+      <p class="empty-sub">Adiciona o primeiro endereço no painel à esquerda.</p>
+    </div>
+  </section>
+
+</main>
+
+<footer class="footbar">
+  <p><span id="footerCount">0</span> nós · persistidos no servidor em <code>data/links.json</code></p>
+</footer>
+
+<!-- Confirmação de apagar -->
+<div id="confirmOverlay" class="confirm-overlay hidden">
+  <div class="confirm-box" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle">
+    <h3 id="confirmTitle">Remover nó?</h3>
+    <p id="confirmText"></p>
+    <div class="confirm-actions">
+      <button class="btn btn-ghost" id="confirmCancel">Cancelar</button>
+      <button class="btn btn-danger" id="confirmDelete">Remover</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="app.js"></script>
+</body>
+</html>

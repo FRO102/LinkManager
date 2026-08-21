@@ -1,0 +1,12 @@
+{
+  "name": "link-manager",
+  "version": "1.0.0",
+  "description": "Gestor de links - adicionar, editar, apagar e filtrar links",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}

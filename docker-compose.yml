@@ -1,0 +1,12 @@
+services:
+  link-manager:
+    build: .
+    container_name: link-manager
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - PORT=3000
+      - DATA_DIR=/app/data
