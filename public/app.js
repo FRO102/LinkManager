@@ -61,8 +61,18 @@
   const btnStats        = $('#btnStats');
   const btnDuplicates   = $('#btnDuplicates');
   const btnCheckLinks   = $('#btnCheckLinks');
+  const btnMoreMenu     = $('#btnMoreMenu');
+  const moreMenu        = $('#moreMenu');
   const checkProgress   = $('#checkProgress');
   const checkProgressText = $('#checkProgressText');
+  const activeFiltersBar = $('#activeFiltersBar');
+  const activeFiltersLabel = $('#activeFiltersLabel');
+  const btnClearFilters = $('#btnClearFilters');
+
+  const composerPanel   = $('#composerPanel');
+  const composerOverlay = $('#composerOverlay');
+  const btnFab          = $('#btnFab');
+  const btnCloseComposer = $('#btnCloseComposer');
 
   const confirmOverlay  = $('#confirmOverlay');
   const confirmText     = $('#confirmText');
@@ -304,8 +314,12 @@
     btnSubmit.textContent = 'Save changes';
     btnCancelEdit.classList.remove('hidden');
     formError.classList.add('hidden');
+    if (isComposerCollapsible()) {
+      openComposerPanel();
+    } else {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
     inputUrl.focus();
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   function exitEditMode() {
@@ -367,6 +381,7 @@
         form.reset();
       }
       await refresh();
+      if (isComposerCollapsible()) closeComposerPanel();
     } catch (err) {
       formError.textContent = err.message;
       formError.classList.remove('hidden');
@@ -431,32 +446,76 @@
     return counts;
   }
 
+  const VISIBLE_TAG_COUNT = 4;
+  let tagPopoverOpen = false;
+  let tagPopoverSearch = '';
+
+  function buildTagChip(tag, count) {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'tag-chip' + (activeTagFilters.has(tag) ? ' active' : '');
+    chip.setAttribute('aria-pressed', String(activeTagFilters.has(tag)));
+    chip.innerHTML = `${escapeHtml(tag)} <span class="tag-count">${count}</span>`;
+    chip.addEventListener('click', () => {
+      if (activeTagFilters.has(tag)) {
+        activeTagFilters.delete(tag);
+      } else {
+        activeTagFilters.add(tag);
+      }
+      renderTagFilters();
+      resetPaginationAndRender();
+    });
+    return chip;
+  }
+
   function renderTagFilters() {
     const counts = collectTagCounts();
-    const tags = Array.from(counts.keys()).sort((a, b) => {
+    const allTags = Array.from(counts.keys()).sort((a, b) => {
       const diff = counts.get(b) - counts.get(a);
       return diff !== 0 ? diff : a.localeCompare(b, 'en');
     });
 
     filterTagsEl.innerHTML = '';
 
-    tags.forEach(tag => {
-      const chip = document.createElement('button');
-      chip.type = 'button';
-      chip.className = 'tag-chip' + (activeTagFilters.has(tag) ? ' active' : '');
-      chip.setAttribute('aria-pressed', String(activeTagFilters.has(tag)));
-      chip.innerHTML = `${escapeHtml(tag)} <span class="tag-count">${counts.get(tag)}</span>`;
-      chip.addEventListener('click', () => {
-        if (activeTagFilters.has(tag)) {
-          activeTagFilters.delete(tag);
-        } else {
-          activeTagFilters.add(tag);
-        }
-        renderTagFilters();
-        resetPaginationAndRender();
-      });
-      filterTagsEl.appendChild(chip);
+    // Always show the top N most-used tags, plus any active tag that didn't
+    // make the cut — an applied filter should never silently disappear from view.
+    const topTags = allTags.slice(0, VISIBLE_TAG_COUNT);
+    const topTagSet = new Set(topTags);
+    const activeOverflow = allTags.filter(t => activeTagFilters.has(t) && !topTagSet.has(t));
+    const visibleTags = [...topTags, ...activeOverflow];
+    const remainingTags = allTags.filter(t => !visibleTags.includes(t));
+
+    visibleTags.forEach(tag => {
+      filterTagsEl.appendChild(buildTagChip(tag, counts.get(tag)));
     });
+
+    if (remainingTags.length > 0) {
+      const moreWrap = document.createElement('div');
+      moreWrap.className = 'tag-more-wrap';
+
+      const moreBtn = document.createElement('button');
+      moreBtn.type = 'button';
+      moreBtn.className = 'tag-chip tag-more-btn';
+      moreBtn.setAttribute('aria-haspopup', 'true');
+      moreBtn.setAttribute('aria-expanded', String(tagPopoverOpen));
+      moreBtn.textContent = `+${remainingTags.length} more`;
+      moreBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        tagPopoverOpen = !tagPopoverOpen;
+        renderTagFilters();
+        if (tagPopoverOpen) {
+          const input = filterTagsEl.querySelector('.tag-popover-search');
+          if (input) input.focus();
+        }
+      });
+      moreWrap.appendChild(moreBtn);
+
+      if (tagPopoverOpen) {
+        moreWrap.appendChild(buildTagPopover(remainingTags, counts));
+      }
+
+      filterTagsEl.appendChild(moreWrap);
+    }
 
     // AND/OR mode control — only relevant with 2+ tags selected
     if (activeTagFilters.size > 1) {
@@ -488,6 +547,53 @@
       });
       filterTagsEl.appendChild(clearBtn);
     }
+  }
+
+  function buildTagPopover(remainingTags, counts) {
+    const popover = document.createElement('div');
+    popover.className = 'tag-popover';
+
+    const searchWrap = document.createElement('div');
+    searchWrap.className = 'tag-popover-search-wrap';
+    const search = document.createElement('input');
+    search.type = 'search';
+    search.className = 'tag-popover-search';
+    search.placeholder = 'Filter tags…';
+    search.value = tagPopoverSearch;
+    search.addEventListener('input', (e) => {
+      tagPopoverSearch = e.target.value;
+      renderTagFilters();
+      const input = filterTagsEl.querySelector('.tag-popover-search');
+      if (input) {
+        input.focus();
+        input.setSelectionRange(input.value.length, input.value.length);
+      }
+    });
+    search.addEventListener('click', (e) => e.stopPropagation());
+    searchWrap.appendChild(search);
+    popover.appendChild(searchWrap);
+
+    const list = document.createElement('div');
+    list.className = 'tag-popover-list';
+
+    const term = tagPopoverSearch.trim().toLowerCase();
+    const filtered = term ? remainingTags.filter(t => t.toLowerCase().includes(term)) : remainingTags;
+
+    if (filtered.length === 0) {
+      const empty = document.createElement('p');
+      empty.className = 'tag-popover-empty';
+      empty.textContent = 'No matching tags.';
+      list.appendChild(empty);
+    } else {
+      filtered.forEach(tag => {
+        const chip = buildTagChip(tag, counts.get(tag));
+        list.appendChild(chip);
+      });
+    }
+
+    popover.appendChild(list);
+    popover.addEventListener('click', (e) => e.stopPropagation());
+    return popover;
   }
 
   function getFilteredSorted() {
@@ -539,6 +645,8 @@
 
   function renderList() {
     const list = getFilteredSorted();
+
+    updateActiveFiltersBar();
 
     linkListEl.innerHTML = '';
     linkListEl.className = 'link-list'
@@ -1080,25 +1188,6 @@
   }
 
   function renderStatsHtml(stats) {
-    const maxTag = stats.topTags[0]?.count || 1;
-    const maxDomain = stats.topDomains[0]?.count || 1;
-
-    const tagBars = stats.topTags.map(t => `
-      <div class="stat-bar-row">
-        <span class="stat-bar-label" title="${escapeHtml(t.tag)}">${escapeHtml(t.tag)}</span>
-        <span class="stat-bar-track"><span class="stat-bar-fill" style="width:${(t.count / maxTag) * 100}%"></span></span>
-        <span class="stat-bar-count">${t.count}</span>
-      </div>
-    `).join('') || '<p class="import-hint">No tags yet.</p>';
-
-    const domainBars = stats.topDomains.map(d => `
-      <div class="stat-bar-row">
-        <span class="stat-bar-label" title="${escapeHtml(d.domain)}">${escapeHtml(d.domain)}</span>
-        <span class="stat-bar-track"><span class="stat-bar-fill" style="width:${(d.count / maxDomain) * 100}%"></span></span>
-        <span class="stat-bar-count">${d.count}</span>
-      </div>
-    `).join('') || '<p class="import-hint">No data.</p>';
-
     return `
       <div class="stats-grid">
         <div class="stat-tile">
@@ -1121,16 +1210,6 @@
           <div class="stat-value">${stats.linkHealth.broken}</div>
           <div class="stat-label">Broken</div>
         </div>
-      </div>
-
-      <div class="stats-section">
-        <h4>Most used tags</h4>
-        ${tagBars}
-      </div>
-
-      <div class="stats-section">
-        <h4>Most saved domains</h4>
-        ${domainBars}
       </div>
     `;
   }
@@ -1180,6 +1259,129 @@
     }
   });
 
+  // ---------- Overflow "More actions" menu ----------
+
+  function openMoreMenu() {
+    moreMenu.classList.remove('hidden');
+    btnMoreMenu.setAttribute('aria-expanded', 'true');
+  }
+
+  function closeMoreMenu() {
+    moreMenu.classList.add('hidden');
+    btnMoreMenu.setAttribute('aria-expanded', 'false');
+  }
+
+  function setupMoreMenu() {
+    btnMoreMenu.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (moreMenu.classList.contains('hidden')) openMoreMenu();
+      else closeMoreMenu();
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!moreMenu.classList.contains('hidden') && !moreMenu.contains(e.target) && e.target !== btnMoreMenu) {
+        closeMoreMenu();
+      }
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeMoreMenu();
+    });
+  }
+
+  // ---------- "More tags" popover ----------
+
+  function setupTagPopover() {
+    document.addEventListener('click', (e) => {
+      if (!tagPopoverOpen) return;
+      const wrap = filterTagsEl.querySelector('.tag-more-wrap');
+      if (wrap && !wrap.contains(e.target)) {
+        tagPopoverOpen = false;
+        tagPopoverSearch = '';
+        renderTagFilters();
+      }
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && tagPopoverOpen) {
+        tagPopoverOpen = false;
+        tagPopoverSearch = '';
+        renderTagFilters();
+      }
+    });
+  }
+
+  // ---------- Clear all filters ----------
+
+  function setupClearFilters() {
+    btnClearFilters.addEventListener('click', () => {
+      activeTagFilters.clear();
+      searchTerm = '';
+      searchInput.value = '';
+      renderTagFilters();
+      resetPaginationAndRender();
+    });
+  }
+
+  function updateActiveFiltersBar() {
+    const parts = [];
+    if (searchTerm) parts.push(`search "${searchTerm}"`);
+    if (activeTagFilters.size > 0) {
+      parts.push(`${activeTagFilters.size} tag${activeTagFilters.size > 1 ? 's' : ''}`);
+    }
+
+    if (parts.length === 0) {
+      activeFiltersBar.classList.add('hidden');
+      return;
+    }
+
+    activeFiltersBar.classList.remove('hidden');
+    activeFiltersLabel.innerHTML = `Filtering by <strong>${escapeHtml(parts.join(' + '))}</strong>`;
+  }
+
+  // ---------- Collapsible composer panel (mobile) ----------
+
+  let composerMediaQuery = null;
+
+  function isComposerCollapsible() {
+    return composerMediaQuery ? composerMediaQuery.matches : false;
+  }
+
+  function openComposerPanel() {
+    composerPanel.classList.add('is-open');
+    composerOverlay.classList.remove('hidden');
+    requestAnimationFrame(() => composerOverlay.classList.add('is-visible'));
+    btnFab.classList.add('is-hidden');
+  }
+
+  function closeComposerPanel() {
+    composerPanel.classList.remove('is-open');
+    composerOverlay.classList.remove('is-visible');
+    btnFab.classList.remove('is-hidden');
+    setTimeout(() => {
+      if (!composerOverlay.classList.contains('is-visible')) composerOverlay.classList.add('hidden');
+    }, 200);
+  }
+
+  function setupComposerPanel() {
+    composerMediaQuery = window.matchMedia('(max-width: 860px)');
+
+    btnFab.addEventListener('click', openComposerPanel);
+    btnCloseComposer.addEventListener('click', closeComposerPanel);
+    composerOverlay.addEventListener('click', closeComposerPanel);
+    btnCancelEdit.addEventListener('click', () => { if (isComposerCollapsible()) closeComposerPanel(); });
+
+    // If the viewport grows past the breakpoint while the sheet is open, just reset state
+    composerMediaQuery.addEventListener('change', (e) => {
+      if (!e.matches) {
+        composerPanel.classList.remove('is-open');
+        composerOverlay.classList.add('hidden');
+        composerOverlay.classList.remove('is-visible');
+        btnFab.classList.remove('is-hidden');
+      }
+    });
+  }
+
   // ---------- Init ----------
 
   async function init() {
@@ -1204,7 +1406,7 @@
       }
     }, { passive: true });
 
-    btnImport.addEventListener('click', openImportModal);
+    btnImport.addEventListener('click', () => { closeMoreMenu(); openImportModal(); });
     importClose.addEventListener('click', closeImportModal);
     importCancel.addEventListener('click', closeImportModal);
     importOverlay.addEventListener('click', (e) => { if (e.target === importOverlay) closeImportModal(); });
@@ -1212,16 +1414,21 @@
     tabJson.addEventListener('click', () => switchImportTab('json'));
     importSubmit.addEventListener('click', handleImportSubmit);
 
-    btnStats.addEventListener('click', openStatsModal);
+    btnStats.addEventListener('click', () => { closeMoreMenu(); openStatsModal(); });
     statsClose.addEventListener('click', closeStatsModal);
     statsOverlay.addEventListener('click', (e) => { if (e.target === statsOverlay) closeStatsModal(); });
 
-    btnDuplicates.addEventListener('click', openDuplicatesModal);
+    btnDuplicates.addEventListener('click', () => { closeMoreMenu(); openDuplicatesModal(); });
     duplicatesClose.addEventListener('click', closeDuplicatesModal);
     duplicatesOverlay.addEventListener('click', (e) => { if (e.target === duplicatesOverlay) closeDuplicatesModal(); });
 
-    btnCheckLinks.addEventListener('click', checkAllLinksNow);
+    btnCheckLinks.addEventListener('click', () => { closeMoreMenu(); checkAllLinksNow(); });
     btnToggleDensity.addEventListener('click', toggleDensity);
+
+    setupMoreMenu();
+    setupTagPopover();
+    setupClearFilters();
+    setupComposerPanel();
 
     await refresh();
 

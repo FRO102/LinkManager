@@ -620,8 +620,6 @@ app.get('/api/stats', (req, res) => {
   let brokenCount = 0;
   let okCount = 0;
   let uncheckedCount = 0;
-  const byMonth = new Map();
-  const byDomain = new Map();
 
   links.forEach(l => {
     if (l.favorite) favoriteCount++;
@@ -631,37 +629,12 @@ app.get('/api/stats', (req, res) => {
     else uncheckedCount++;
 
     (l.tags || []).forEach(t => tagCounts.set(t, (tagCounts.get(t) || 0) + 1));
-
-    const month = (l.createdAt || '').slice(0, 7); // YYYY-MM
-    if (month) byMonth.set(month, (byMonth.get(month) || 0) + 1);
-
-    try {
-      const host = new URL(l.url).hostname.replace(/^www\./, '');
-      byDomain.set(host, (byDomain.get(host) || 0) + 1);
-    } catch {}
   });
-
-  const topTags = Array.from(tagCounts.entries())
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 15)
-    .map(([tag, count]) => ({ tag, count }));
-
-  const topDomains = Array.from(byDomain.entries())
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 10)
-    .map(([domain, count]) => ({ domain, count }));
-
-  const addedByMonth = Array.from(byMonth.entries())
-    .sort((a, b) => a[0].localeCompare(b[0]))
-    .map(([month, count]) => ({ month, count }));
 
   res.json({
     total: links.length,
     favorites: favoriteCount,
     linkHealth: { ok: okCount, broken: brokenCount, unchecked: uncheckedCount },
-    topTags,
-    topDomains,
-    addedByMonth,
     totalTags: tagCounts.size,
   });
 });

@@ -62,7 +62,7 @@ App available at http://localhost:3000.
 
 ### Preview and statistics
 - **Preview on hover** over a node's title — shows the Open Graph image, title, and description of the site (cached for 1h on the server)
-- **Collection statistics**: total nodes, favorites, tags, link health, most used tags, and most saved domains
+- **Collection statistics**: total nodes, favorites, tags, and link health (ok/broken)
 
 ### Robustness
 - **Automatic daily backup** of the data, with rotation (keeps the last 14 copies by default) — stored in `data/backups/`

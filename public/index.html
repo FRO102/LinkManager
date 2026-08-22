@@ -25,10 +25,18 @@
       <span class="status-label">Connected to server</span>
     </span>
     <div class="file-buttons">
-      <button class="btn btn-ghost" id="btnStats" title="View collection statistics">Statistics</button>
-      <button class="btn btn-ghost" id="btnDuplicates" title="View duplicate nodes">Duplicates</button>
-      <button class="btn btn-ghost" id="btnCheckLinks" title="Check all links now">Check links</button>
-      <button class="btn btn-ghost" id="btnImport" title="Import bookmarks or links.json">Import</button>
+      <div class="overflow-menu-wrap">
+        <button class="btn btn-ghost" id="btnMoreMenu" aria-haspopup="true" aria-expanded="false" title="More actions">
+          Actions
+          <svg width="10" height="6" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M1 1L5 5L9 1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+        </button>
+        <div class="overflow-menu hidden" id="moreMenu" role="menu">
+          <button class="overflow-menu-item" id="btnStats" role="menuitem" title="View collection statistics">Statistics</button>
+          <button class="overflow-menu-item" id="btnDuplicates" role="menuitem" title="View duplicate nodes">Duplicates</button>
+          <button class="overflow-menu-item" id="btnCheckLinks" role="menuitem" title="Check all links now">Check links</button>
+          <button class="overflow-menu-item" id="btnImport" role="menuitem" title="Import bookmarks or links.json">Import</button>
+        </div>
+      </div>
       <button class="btn btn-ghost" id="btnToggleTheme" title="Toggle theme">🌗</button>
       <button class="btn btn-ghost" id="btnExport" title="Download a copy as links.json">Export .json</button>
     </div>
@@ -37,8 +45,11 @@
 
 <main class="layout">
 
-  <section class="composer" aria-labelledby="composerTitle">
-    <h2 id="composerTitle" class="section-eyebrow">01 — Add node</h2>
+  <section class="composer" aria-labelledby="composerTitle" id="composerPanel">
+    <div class="composer-panel-header">
+      <h2 id="composerTitle" class="section-eyebrow">01 — Add node</h2>
+      <button type="button" class="btn-icon-close composer-close" id="btnCloseComposer" aria-label="Close">✕</button>
+    </div>
 
     <form id="linkForm" class="link-form" autocomplete="off">
       <input type="hidden" id="editingId">
@@ -77,6 +88,12 @@
     </form>
   </section>
 
+  <div class="composer-overlay hidden" id="composerOverlay"></div>
+
+  <button type="button" class="fab" id="btnFab" title="Add node" aria-label="Add node">
+    <svg width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M11 4V18M4 11H18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+  </button>
+
   <section class="collection" aria-labelledby="collectionTitle">
     <div class="collection-header">
       <h2 id="collectionTitle" class="section-eyebrow">02 — Collection</h2>
@@ -100,6 +117,11 @@
 
         <button class="btn btn-ghost" id="btnToggleView" title="Toggle between list and grid">⊞</button>
         <button class="btn btn-ghost" id="btnToggleDensity" title="Toggle density (compact/comfortable)">≣</button>
+      </div>
+
+      <div class="active-filters-bar hidden" id="activeFiltersBar">
+        <span class="active-filters-label" id="activeFiltersLabel"></span>
+        <button type="button" class="clear-filters-btn" id="btnClearFilters">Clear all filters</button>
       </div>
 
       <div class="check-progress hidden" id="checkProgress">
