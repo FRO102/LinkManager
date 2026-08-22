@@ -2,15 +2,15 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Instala dependências primeiro (cache de layers do Docker)
+# Install dependencies first (Docker layer caching)
 COPY package.json ./
 RUN npm install --omit=dev
 
-# Copia o resto do código da app
+# Copy the rest of the app's code
 COPY server.js ./
 COPY public ./public
 
-# Pasta onde os dados (links.json) vão ficar persistidos
+# Folder where the data (links.json) will be persisted
 RUN mkdir -p /app/data
 ENV DATA_DIR=/app/data
 ENV PORT=3000

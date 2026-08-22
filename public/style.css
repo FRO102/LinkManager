@@ -1,6 +1,6 @@
 /* ============================================================
-   Nós — Gestor de Links
-   Paleta: papel técnico / tinta índigo / cobre
+   Nodes — Link Manager
+   Palette: technical paper / indigo ink / copper
    ============================================================ */
 
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap');
@@ -741,7 +741,7 @@ button, input, textarea, select{
 .toast.error{ background: var(--danger); }
 .toast.success{ background: var(--good); }
 
-/* ---------- Progresso de verificação de links ---------- */
+/* ---------- Link check progress ---------- */
 
 .check-progress{
   display: inline-flex;
@@ -766,7 +766,7 @@ button, input, textarea, select{
   to{ transform: rotate(360deg); }
 }
 
-/* ---------- Estado de saúde do link (ok / broken / unchecked) ---------- */
+/* ---------- Link health status (ok / broken / blocked / unchecked) ---------- */
 
 .link-health-badge{
   display: inline-flex;
@@ -789,6 +789,10 @@ button, input, textarea, select{
   color: var(--danger);
   border-color: var(--danger);
 }
+.link-health-badge[data-status="blocked"]{
+  color: var(--copper);
+  border-color: var(--copper);
+}
 .link-health-badge .health-dot{
   width: 5px;
   height: 5px;
@@ -796,7 +800,7 @@ button, input, textarea, select{
   background: currentColor;
 }
 
-/* ---------- Drag & drop reordenar ---------- */
+/* ---------- Drag & drop reordering ---------- */
 
 .link-card.is-dragging{
   opacity: 0.4;
@@ -822,12 +826,12 @@ button, input, textarea, select{
 .link-card:hover .drag-handle{ opacity: 0.9; }
 .drag-handle:active{ cursor: grabbing; }
 
-/* Só faz sentido reordenar manualmente quando a ordenação é "manual" */
+/* Manual reordering only makes sense when sort mode is "manual" */
 .link-list:not(.sort-manual) .drag-handle{
   visibility: hidden;
 }
 
-/* ---------- Densidade compacta ---------- */
+/* ---------- Compact density ---------- */
 
 .link-list.density-compact .link-card{
   padding: 8px 14px;
@@ -850,7 +854,7 @@ button, input, textarea, select{
   flex-direction: row;
 }
 
-/* ---------- Modal genérico (import / stats / duplicados) ---------- */
+/* ---------- Generic modal (import / stats / duplicates) ---------- */
 
 .modal-box{
   max-width: 480px;
@@ -941,7 +945,7 @@ input[type="file"]{
   color: var(--ink-soft);
 }
 
-/* ---------- Estatísticas ---------- */
+/* ---------- Statistics ---------- */
 
 .stats-box{ max-width: 560px; }
 
@@ -1029,7 +1033,7 @@ input[type="file"]{
   text-align: right;
 }
 
-/* ---------- Duplicados ---------- */
+/* ---------- Duplicates ---------- */
 
 .duplicates-content{
   max-height: 60vh;

@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="pt-PT">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Nós — Gestor de Links</title>
+<title>Nodes — Link Manager</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -14,23 +14,23 @@
   <div class="brand">
     <span class="brand-mark">◈</span>
     <div class="brand-text">
-      <h1>Nós</h1>
-      <p class="brand-sub">catálogo pessoal de endereços</p>
+      <h1>Nodes</h1>
+      <p class="brand-sub">your personal link catalog</p>
     </div>
   </div>
 
   <div class="file-controls">
     <span class="file-status" id="fileStatus" data-state="connected">
       <span class="status-dot"></span>
-      <span class="status-label">Ligado ao servidor</span>
+      <span class="status-label">Connected to server</span>
     </span>
     <div class="file-buttons">
-      <button class="btn btn-ghost" id="btnStats" title="Ver estatísticas da coleção">Estatísticas</button>
-      <button class="btn btn-ghost" id="btnDuplicates" title="Ver nós duplicados">Duplicados</button>
-      <button class="btn btn-ghost" id="btnCheckLinks" title="Verificar todos os links agora">Verificar links</button>
-      <button class="btn btn-ghost" id="btnImport" title="Importar bookmarks ou links.json">Importar</button>
-      <button class="btn btn-ghost" id="btnToggleTheme" title="Alternar tema">🌗</button>
-      <button class="btn btn-ghost" id="btnExport" title="Descarregar cópia como links.json">Exportar .json</button>
+      <button class="btn btn-ghost" id="btnStats" title="View collection statistics">Statistics</button>
+      <button class="btn btn-ghost" id="btnDuplicates" title="View duplicate nodes">Duplicates</button>
+      <button class="btn btn-ghost" id="btnCheckLinks" title="Check all links now">Check links</button>
+      <button class="btn btn-ghost" id="btnImport" title="Import bookmarks or links.json">Import</button>
+      <button class="btn btn-ghost" id="btnToggleTheme" title="Toggle theme">🌗</button>
+      <button class="btn btn-ghost" id="btnExport" title="Download a copy as links.json">Export .json</button>
     </div>
   </div>
 </header>
@@ -38,133 +38,133 @@
 <main class="layout">
 
   <section class="composer" aria-labelledby="composerTitle">
-    <h2 id="composerTitle" class="section-eyebrow">01 — Adicionar nó</h2>
+    <h2 id="composerTitle" class="section-eyebrow">01 — Add node</h2>
 
     <form id="linkForm" class="link-form" autocomplete="off">
       <input type="hidden" id="editingId">
 
       <div class="field field-url">
-        <label for="inputUrl">Endereço (URL)</label>
-        <input type="url" id="inputUrl" name="url" placeholder="https://exemplo.com/pagina" required>
+        <label for="inputUrl">Address (URL)</label>
+        <input type="url" id="inputUrl" name="url" placeholder="https://example.com/page" required>
       </div>
 
       <div class="field">
-        <label for="inputTitle">Título</label>
-        <input type="text" id="inputTitle" name="title" placeholder="Nome a apresentar" required>
+        <label for="inputTitle">Title</label>
+        <input type="text" id="inputTitle" name="title" placeholder="Display name" required>
       </div>
 
       <div class="field">
         <label for="inputTags">Tags</label>
-        <input type="text" id="inputTags" name="tags" placeholder="trabalho, leitura, ferramenta (separadas por vírgula)">
+        <input type="text" id="inputTags" name="tags" placeholder="work, reading, tool (comma-separated)">
       </div>
 
       <div class="field field-notes">
-        <label for="inputNotes">Notas</label>
-        <textarea id="inputNotes" name="notes" rows="2" placeholder="Contexto opcional…"></textarea>
+        <label for="inputNotes">Notes</label>
+        <textarea id="inputNotes" name="notes" rows="2" placeholder="Optional context…"></textarea>
       </div>
 
       <div class="field field-favorite">
         <label class="checkbox-row" for="inputFavorite">
           <input type="checkbox" id="inputFavorite" name="favorite">
-          <span>Marcar como favorito</span>
+          <span>Mark as favorite</span>
         </label>
       </div>
 
       <p class="form-error hidden" id="formError"></p>
 
-      <button type="submit" class="btn btn-primary btn-add" id="btnSubmit">Guardar nó</button>
-      <button type="button" class="btn btn-ghost btn-cancel-edit hidden" id="btnCancelEdit">Cancelar edição</button>
+      <button type="submit" class="btn btn-primary btn-add" id="btnSubmit">Save node</button>
+      <button type="button" class="btn btn-ghost btn-cancel-edit hidden" id="btnCancelEdit">Cancel edit</button>
     </form>
   </section>
 
   <section class="collection" aria-labelledby="collectionTitle">
     <div class="collection-header">
-      <h2 id="collectionTitle" class="section-eyebrow">02 — Coleção</h2>
+      <h2 id="collectionTitle" class="section-eyebrow">02 — Collection</h2>
 
       <div class="toolbar">
-        <input type="search" id="searchInput" class="search-input" placeholder="Pesquisar título, URL, etiqueta ou nota…">
+        <input type="search" id="searchInput" class="search-input" placeholder="Search title, URL, tag, or note…">
 
-        <div class="filter-tags" id="filterTags" role="group" aria-label="Filtrar por etiqueta"></div>
+        <div class="filter-tags" id="filterTags" role="group" aria-label="Filter by tag"></div>
 
         <div class="sort-control">
-          <label for="sortSelect">Ordenar</label>
+          <label for="sortSelect">Sort</label>
           <select id="sortSelect">
-            <option value="recent">Mais recentes</option>
-            <option value="oldest">Mais antigos</option>
-            <option value="az">Título A–Z</option>
-            <option value="za">Título Z–A</option>
-            <option value="favorites">Favoritos primeiro</option>
-            <option value="manual">Ordem manual (arrastar)</option>
+            <option value="recent">Most recent</option>
+            <option value="oldest">Oldest</option>
+            <option value="az">Title A–Z</option>
+            <option value="za">Title Z–A</option>
+            <option value="favorites">Favorites first</option>
+            <option value="manual">Manual order (drag)</option>
           </select>
         </div>
 
-        <button class="btn btn-ghost" id="btnToggleView" title="Alternar entre lista e grelha">⊞</button>
-        <button class="btn btn-ghost" id="btnToggleDensity" title="Alternar densidade (compacta/confortável)">≣</button>
+        <button class="btn btn-ghost" id="btnToggleView" title="Toggle between list and grid">⊞</button>
+        <button class="btn btn-ghost" id="btnToggleDensity" title="Toggle density (compact/comfortable)">≣</button>
       </div>
 
       <div class="check-progress hidden" id="checkProgress">
         <span class="spinner" aria-hidden="true"></span>
-        <span id="checkProgressText">A verificar links…</span>
+        <span id="checkProgressText">Checking links…</span>
       </div>
     </div>
 
-    <p class="count-line" id="countLine">0 nós guardados</p>
+    <p class="count-line" id="countLine">0 nodes saved</p>
 
     <ul class="link-list" id="linkList"></ul>
 
     <div class="empty-state" id="emptyState">
       <span class="empty-mark">◇</span>
-      <p>Ainda não há nós na coleção.</p>
-      <p class="empty-sub">Adiciona o primeiro endereço no painel à esquerda.</p>
+      <p>No nodes in the collection yet.</p>
+      <p class="empty-sub">Add your first address in the panel on the left.</p>
     </div>
   </section>
 
 </main>
 
 <footer class="footbar">
-  <p><span id="footerCount">0</span> nós · persistidos no servidor em <code>data/links.json</code></p>
+  <p><span id="footerCount">0</span> nodes · persisted on the server at <code>data/links.json</code></p>
 </footer>
 
-<!-- Confirmação de apagar -->
+<!-- Delete confirmation -->
 <div id="confirmOverlay" class="confirm-overlay hidden">
   <div class="confirm-box" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle">
-    <h3 id="confirmTitle">Remover nó?</h3>
+    <h3 id="confirmTitle">Remove node?</h3>
     <p id="confirmText"></p>
     <div class="confirm-actions">
-      <button class="btn btn-ghost" id="confirmCancel">Cancelar</button>
-      <button class="btn btn-danger" id="confirmDelete">Remover</button>
+      <button class="btn btn-ghost" id="confirmCancel">Cancel</button>
+      <button class="btn btn-danger" id="confirmDelete">Remove</button>
     </div>
   </div>
 </div>
 
-<!-- Modal de importação -->
+<!-- Import modal -->
 <div id="importOverlay" class="confirm-overlay hidden">
   <div class="confirm-box modal-box" role="dialog" aria-modal="true" aria-labelledby="importTitle">
     <div class="modal-box-header">
-      <h3 id="importTitle">Importar nós</h3>
-      <button class="btn-icon-close" id="importClose" aria-label="Fechar">✕</button>
+      <h3 id="importTitle">Import nodes</h3>
+      <button class="btn-icon-close" id="importClose" aria-label="Close">✕</button>
     </div>
 
     <div class="import-tabs" role="tablist">
       <button class="import-tab active" id="tabBookmarks" data-tab="bookmarks" role="tab" aria-selected="true">Bookmarks (.html)</button>
-      <button class="import-tab" id="tabJson" data-tab="json" role="tab" aria-selected="false">Ficheiro .json</button>
+      <button class="import-tab" id="tabJson" data-tab="json" role="tab" aria-selected="false">.json file</button>
     </div>
 
     <div class="import-panel" id="panelBookmarks">
-      <p class="import-hint">Exporta os favoritos do Chrome, Firefox ou Edge como HTML e carrega aqui.</p>
+      <p class="import-hint">Export your bookmarks from Chrome, Firefox, or Edge as HTML and upload it here.</p>
       <input type="file" id="fileBookmarks" accept=".html,.htm">
       <div class="field">
-        <label for="importTagsBookmarks">Etiqueta a aplicar a todos (opcional)</label>
-        <input type="text" id="importTagsBookmarks" placeholder="ex: importado-chrome">
+        <label for="importTagsBookmarks">Tag to apply to all (optional)</label>
+        <input type="text" id="importTagsBookmarks" placeholder="e.g. imported-chrome">
       </div>
     </div>
 
     <div class="import-panel hidden" id="panelJson">
-      <p class="import-hint">Carrega um ficheiro <code>links.json</code> exportado desta app (ou de outra instância).</p>
+      <p class="import-hint">Upload a <code>links.json</code> file exported from this app (or another instance).</p>
       <input type="file" id="fileJson" accept=".json">
       <div class="field">
-        <label for="importTagsJson">Etiqueta a aplicar a todos (opcional)</label>
-        <input type="text" id="importTagsJson" placeholder="ex: importado-backup">
+        <label for="importTagsJson">Tag to apply to all (optional)</label>
+        <input type="text" id="importTagsJson" placeholder="e.g. imported-backup">
       </div>
     </div>
 
@@ -172,45 +172,45 @@
     <p class="import-result hidden" id="importResult"></p>
 
     <div class="confirm-actions">
-      <button class="btn btn-ghost" id="importCancel">Cancelar</button>
-      <button class="btn btn-primary" id="importSubmit">Importar</button>
+      <button class="btn btn-ghost" id="importCancel">Cancel</button>
+      <button class="btn btn-primary" id="importSubmit">Import</button>
     </div>
   </div>
 </div>
 
-<!-- Modal de estatísticas -->
+<!-- Statistics modal -->
 <div id="statsOverlay" class="confirm-overlay hidden">
   <div class="confirm-box modal-box stats-box" role="dialog" aria-modal="true" aria-labelledby="statsTitle">
     <div class="modal-box-header">
-      <h3 id="statsTitle">Estatísticas da coleção</h3>
-      <button class="btn-icon-close" id="statsClose" aria-label="Fechar">✕</button>
+      <h3 id="statsTitle">Collection statistics</h3>
+      <button class="btn-icon-close" id="statsClose" aria-label="Close">✕</button>
     </div>
     <div id="statsContent" class="stats-content">
-      <p class="import-hint">A carregar…</p>
+      <p class="import-hint">Loading…</p>
     </div>
   </div>
 </div>
 
-<!-- Modal de duplicados -->
+<!-- Duplicates modal -->
 <div id="duplicatesOverlay" class="confirm-overlay hidden">
   <div class="confirm-box modal-box" role="dialog" aria-modal="true" aria-labelledby="duplicatesTitle">
     <div class="modal-box-header">
-      <h3 id="duplicatesTitle">Nós duplicados</h3>
-      <button class="btn-icon-close" id="duplicatesClose" aria-label="Fechar">✕</button>
+      <h3 id="duplicatesTitle">Duplicate nodes</h3>
+      <button class="btn-icon-close" id="duplicatesClose" aria-label="Close">✕</button>
     </div>
     <div id="duplicatesContent" class="duplicates-content"></div>
   </div>
 </div>
 
-<!-- Preview flutuante (Open Graph) -->
+<!-- Floating preview (Open Graph) -->
 <div id="linkPreview" class="link-preview-popover hidden">
-  <div class="preview-loading" id="previewLoading">A carregar preview…</div>
+  <div class="preview-loading" id="previewLoading">Loading preview…</div>
   <div class="preview-body hidden" id="previewBody">
     <img id="previewImage" class="preview-image hidden" alt="">
     <p id="previewTitle" class="preview-title"></p>
     <p id="previewDescription" class="preview-description"></p>
   </div>
-  <div class="preview-empty hidden" id="previewEmpty">Sem preview disponível para este endereço.</div>
+  <div class="preview-empty hidden" id="previewEmpty">No preview available for this address.</div>
 </div>
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>

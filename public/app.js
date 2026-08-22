@@ -1,6 +1,6 @@
 // ============================================================
-// Nós — Gestor de Links
-// Persistência: API REST do servidor (Express), guardada em data/links.json
+// Nodes — Link Manager
+// Persistence: server REST API (Express), stored in data/links.json
 // ============================================================
 
 (() => {
@@ -14,20 +14,20 @@
   let pendingDeleteId = null;
 
   let activeTagFilters = new Set();
-  let tagFilterMode = 'or'; // 'or' = qualquer etiqueta selecionada; 'and' = todas
+  let tagFilterMode = 'or'; // 'or' = any selected tag; 'and' = all
   let searchTerm = '';
   let sortMode = 'recent';
   let viewMode = 'list';
   let density = 'comfortable';
 
-  // Paginação transparente: a lista cresce conforme se aproxima do fim da página,
-  // sem números de página visíveis — apenas um "carregar mais" automático.
+  // Transparent pagination: the list grows as you approach the end of the page,
+  // with no visible page numbers — just an automatic "load more".
   const PAGE_SIZE = 40;
   let visibleCount = PAGE_SIZE;
-  let renderedIds = []; // IDs atualmente na DOM, na ordem — usado pelo drag & drop
+  let renderedIds = []; // IDs currently in the DOM, in order — used by drag & drop
 
-  try { viewMode = localStorage.getItem('nos-view-mode') || 'list'; } catch {}
-  try { density = localStorage.getItem('nos-density') || 'comfortable'; } catch {}
+  try { viewMode = localStorage.getItem('nodes-view-mode') || 'list'; } catch {}
+  try { density = localStorage.getItem('nodes-density') || 'comfortable'; } catch {}
 
   // ---------- DOM refs ----------
   const $ = (sel) => document.querySelector(sel);
@@ -139,7 +139,7 @@
   function formatDate(iso) {
     try {
       const d = new Date(iso);
-      return d.toLocaleDateString('pt-PT', { day: '2-digit', month: 'short', year: 'numeric' });
+      return d.toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' });
     } catch {
       return '';
     }
@@ -163,19 +163,19 @@
     if (!iso) return null;
     const diffMs = Date.now() - new Date(iso).getTime();
     const mins = Math.round(diffMs / 60000);
-    if (mins < 1) return 'agora mesmo';
-    if (mins < 60) return `há ${mins} min`;
+    if (mins < 1) return 'just now';
+    if (mins < 60) return `${mins} min ago`;
     const hours = Math.round(mins / 60);
-    if (hours < 24) return `há ${hours}h`;
+    if (hours < 24) return `${hours}h ago`;
     const days = Math.round(hours / 24);
-    return `há ${days}d`;
+    return `${days}d ago`;
   }
 
   // ---------- API ----------
 
   async function apiList() {
     const res = await fetch(API);
-    if (!res.ok) throw new Error('Falha ao carregar');
+    if (!res.ok) throw new Error('Failed to load');
     return res.json();
   }
 
@@ -186,7 +186,7 @@
       body: JSON.stringify(payload),
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Erro ao criar nó');
+    if (!res.ok) throw new Error(data.error || 'Error creating node');
     return data;
   }
 
@@ -197,7 +197,7 @@
       body: JSON.stringify(payload),
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Erro ao atualizar nó');
+    if (!res.ok) throw new Error(data.error || 'Error updating node');
     return data;
   }
 
@@ -205,7 +205,7 @@
     const res = await fetch(`${API}/${id}`, { method: 'DELETE' });
     if (!res.ok) {
       const data = await res.json();
-      throw new Error(data.error || 'Erro ao remover nó');
+      throw new Error(data.error || 'Error removing node');
     }
   }
 
@@ -215,20 +215,20 @@
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ orderedIds }),
     });
-    if (!res.ok) throw new Error('Erro ao guardar nova ordem');
+    if (!res.ok) throw new Error('Error saving new order');
   }
 
   async function apiCheckOne(id) {
     const res = await fetch(`${API}/${id}/check`, { method: 'POST' });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Erro ao verificar link');
+    if (!res.ok) throw new Error(data.error || 'Error checking link');
     return data;
   }
 
   async function apiCheckAll() {
     const res = await fetch(`${API}/check-all`, { method: 'POST' });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Erro ao verificar links');
+    if (!res.ok) throw new Error(data.error || 'Error checking links');
     return data;
   }
 
@@ -250,7 +250,7 @@
       body: JSON.stringify({ html, defaultTags }),
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Erro ao importar bookmarks');
+    if (!res.ok) throw new Error(data.error || 'Error importing bookmarks');
     return data;
   }
 
@@ -261,19 +261,19 @@
       body: JSON.stringify({ items, defaultTags }),
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Erro ao importar ficheiro');
+    if (!res.ok) throw new Error(data.error || 'Error importing file');
     return data;
   }
 
   async function apiStats() {
     const res = await fetch('/api/stats');
-    if (!res.ok) throw new Error('Erro ao obter estatísticas');
+    if (!res.ok) throw new Error('Error fetching statistics');
     return res.json();
   }
 
   async function apiDuplicates() {
     const res = await fetch('/api/duplicates');
-    if (!res.ok) throw new Error('Erro ao obter duplicados');
+    if (!res.ok) throw new Error('Error fetching duplicates');
     return res.json();
   }
 
@@ -287,7 +287,7 @@
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
-    showToast('Ficheiro .json descarregado', 'success');
+    showToast('.json file downloaded', 'success');
   }
 
   // ---------- CRUD ----------
@@ -300,8 +300,8 @@
     inputTags.value = (link.tags || []).join(', ');
     inputNotes.value = link.description || '';
     inputFavorite.checked = !!link.favorite;
-    composerTitle.textContent = '01 — Editar nó';
-    btnSubmit.textContent = 'Guardar alterações';
+    composerTitle.textContent = '01 — Edit node';
+    btnSubmit.textContent = 'Save changes';
     btnCancelEdit.classList.remove('hidden');
     formError.classList.add('hidden');
     inputUrl.focus();
@@ -312,8 +312,8 @@
     editingId = null;
     editingIdInput.value = '';
     form.reset();
-    composerTitle.textContent = '01 — Adicionar nó';
-    btnSubmit.textContent = 'Guardar nó';
+    composerTitle.textContent = '01 — Add node';
+    btnSubmit.textContent = 'Save node';
     btnCancelEdit.classList.add('hidden');
     formError.classList.add('hidden');
   }
@@ -326,24 +326,24 @@
     try {
       new URL(url);
     } catch {
-      formError.textContent = 'Endereço inválido.';
+      formError.textContent = 'Invalid address.';
       formError.classList.remove('hidden');
       return;
     }
 
-    // Deteção de duplicados — só ao criar, não ao editar o próprio nó
+    // Duplicate detection — only when creating, not when editing the node itself
     if (!editingId) {
       try {
         const dupRes = await fetch(`${API}/check-duplicate?url=${encodeURIComponent(url)}`);
         const dupData = await dupRes.json();
         if (dupData.duplicate) {
           const proceed = window.confirm(
-            `Já tens um nó com este endereço: "${dupData.existing.title}".\n\nQueres guardar mesmo assim?`
+            `You already have a node with this address: "${dupData.existing.title}".\n\nSave anyway?`
           );
           if (!proceed) return;
         }
       } catch {
-        // Se a verificação falhar, não bloqueia o fluxo — segue em frente
+        // If the check fails, don't block the flow — proceed anyway
       }
     }
 
@@ -359,11 +359,11 @@
     try {
       if (editingId) {
         await apiUpdate(editingId, payload);
-        showToast('Nó atualizado', 'success');
+        showToast('Node updated', 'success');
         exitEditMode();
       } else {
         await apiCreate(payload);
-        showToast('Nó adicionado', 'success');
+        showToast('Node added', 'success');
         form.reset();
       }
       await refresh();
@@ -377,7 +377,7 @@
 
   function openConfirm(link) {
     pendingDeleteId = link.id;
-    confirmText.textContent = `Tens a certeza que queres remover "${link.title}"? Esta ação não pode ser desfeita.`;
+    confirmText.textContent = `Are you sure you want to remove "${link.title}"? This action cannot be undone.`;
     confirmOverlay.classList.remove('hidden');
   }
 
@@ -392,7 +392,7 @@
     try {
       await apiDelete(pendingDeleteId);
       if (editingId === pendingDeleteId) exitEditMode();
-      showToast(`"${link ? link.title : 'Nó'}" removido`);
+      showToast(`"${link ? link.title : 'Node'}" removed`);
       closeConfirm();
       await refresh();
     } catch (err) {
@@ -415,11 +415,11 @@
   async function refresh() {
     try {
       links = await apiList();
-      setStatus('connected', 'Ligado ao servidor');
+      setStatus('connected', 'Connected to server');
       render();
     } catch (err) {
-      setStatus('error', 'Falha na ligação');
-      showToast('Não foi possível contactar o servidor', 'error');
+      setStatus('error', 'Connection failed');
+      showToast('Could not reach the server', 'error');
     }
   }
 
@@ -435,7 +435,7 @@
     const counts = collectTagCounts();
     const tags = Array.from(counts.keys()).sort((a, b) => {
       const diff = counts.get(b) - counts.get(a);
-      return diff !== 0 ? diff : a.localeCompare(b, 'pt');
+      return diff !== 0 ? diff : a.localeCompare(b, 'en');
     });
 
     filterTagsEl.innerHTML = '';
@@ -458,15 +458,15 @@
       filterTagsEl.appendChild(chip);
     });
 
-    // Controlo de modo AND/OR — só relevante com 2+ etiquetas selecionadas
+    // AND/OR mode control — only relevant with 2+ tags selected
     if (activeTagFilters.size > 1) {
       const modeBtn = document.createElement('button');
       modeBtn.type = 'button';
       modeBtn.className = 'tag-mode-btn';
       modeBtn.title = tagFilterMode === 'or'
-        ? 'A mostrar nós com qualquer uma das etiquetas — clica para exigir todas'
-        : 'A mostrar nós com todas as etiquetas — clica para aceitar qualquer uma';
-      modeBtn.textContent = tagFilterMode === 'or' ? 'qualquer uma' : 'todas';
+        ? 'Showing nodes with any of the selected tags — click to require all'
+        : 'Showing nodes with all selected tags — click to accept any';
+      modeBtn.textContent = tagFilterMode === 'or' ? 'any' : 'all';
       modeBtn.addEventListener('click', () => {
         tagFilterMode = tagFilterMode === 'or' ? 'and' : 'or';
         renderTagFilters();
@@ -479,8 +479,8 @@
       const clearBtn = document.createElement('button');
       clearBtn.type = 'button';
       clearBtn.className = 'tag-clear-btn';
-      clearBtn.title = 'Limpar filtro de tags';
-      clearBtn.textContent = '✕ limpar';
+      clearBtn.title = 'Clear tag filter';
+      clearBtn.textContent = '✕ clear';
       clearBtn.addEventListener('click', () => {
         activeTagFilters.clear();
         renderTagFilters();
@@ -517,10 +517,10 @@
         list.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
         break;
       case 'az':
-        list.sort((a, b) => a.title.localeCompare(b.title, 'pt'));
+        list.sort((a, b) => a.title.localeCompare(b.title, 'en'));
         break;
       case 'za':
-        list.sort((a, b) => b.title.localeCompare(a.title, 'pt'));
+        list.sort((a, b) => b.title.localeCompare(a.title, 'en'));
         break;
       case 'favorites':
         list.sort((a, b) => (b.favorite - a.favorite) || (new Date(b.createdAt) - new Date(a.createdAt)));
@@ -548,7 +548,7 @@
 
     if (links.length === 0) {
       emptyState.classList.add('visible');
-      emptyState.querySelector('p').textContent = 'Ainda não há nós na coleção.';
+      emptyState.querySelector('p').textContent = 'No nodes in the collection yet.';
       linkListEl.style.display = 'none';
       renderedIds = [];
       updateCountLine(list.length);
@@ -557,7 +557,7 @@
 
     if (list.length === 0) {
       emptyState.classList.add('visible');
-      emptyState.querySelector('p').textContent = 'Nenhum nó corresponde à pesquisa.';
+      emptyState.querySelector('p').textContent = 'No node matches your search.';
       linkListEl.style.display = 'none';
       renderedIds = [];
       updateCountLine(list.length);
@@ -567,8 +567,8 @@
     emptyState.classList.remove('visible');
     linkListEl.style.display = '';
 
-    // Paginação transparente: só renderiza os primeiros `visibleCount`.
-    // Mais itens entram automaticamente ao aproximar-se do fim (ver observer no init).
+    // Transparent pagination: only renders the first `visibleCount`.
+    // More items load automatically near the end (see scroll listener in init).
     const slice = list.slice(0, visibleCount);
     renderedIds = slice.map(l => l.id);
 
@@ -581,11 +581,44 @@
 
   function updateCountLine(filteredTotal) {
     const tagSummary = activeTagFilters.size > 0
-      ? ` · etiquetas: ${Array.from(activeTagFilters).join(tagFilterMode === 'and' ? ' + ' : ' ou ')}`
+      ? ` · tags: ${Array.from(activeTagFilters).join(tagFilterMode === 'and' ? ' + ' : ' or ')}`
       : '';
     const shown = Math.min(visibleCount, filteredTotal);
-    countLine.textContent = `${shown} de ${filteredTotal} nós${tagSummary}`;
+    countLine.textContent = `${shown} of ${filteredTotal} nodes${tagSummary}`;
     footerCount.textContent = links.length;
+  }
+
+  // Codes that mean "the server is up but refused/rate-limited this request" —
+  // shown as "blocked" rather than "broken", since the site itself may be fine.
+  const BLOCKED_STATUS_CODES = new Set([401, 403, 429]);
+
+  function buildHealthBadge(link) {
+    if (!link.linkStatus) {
+      return `<button type="button" class="link-health-badge" data-status="unchecked" data-action="check-one" data-id="${link.id}" title="Not checked yet — click to check">
+          <span class="health-dot"></span>unchecked
+        </button>`;
+    }
+
+    const isBlocked = link.linkStatus === 'broken' && BLOCKED_STATUS_CODES.has(link.linkStatusCode);
+    const badgeStatus = isBlocked ? 'blocked' : link.linkStatus;
+    const label = link.linkStatus === 'ok' ? 'ok' : (isBlocked ? 'blocked' : 'broken');
+
+    let tooltip;
+    if (link.linkStatus === 'ok') {
+      tooltip = 'Link is reachable';
+    } else if (isBlocked) {
+      tooltip = 'Site is likely online but blocked this automated request (this happens with some anti-bot protections) — worth checking manually in your browser';
+    } else if (link.linkStatusError === 'timeout') {
+      tooltip = 'The site took too long to respond (timeout)';
+    } else if (link.linkStatusError === 'unreachable') {
+      tooltip = 'Could not connect at all (DNS failure, connection refused, or similar) — worth double-checking the address is correct';
+    } else {
+      tooltip = 'Link may be down';
+    }
+
+    return `<button type="button" class="link-health-badge" data-status="${badgeStatus}" data-action="check-one" data-id="${link.id}" title="${tooltip}${link.linkStatusCode ? ' (HTTP ' + link.linkStatusCode + ')' : ''} · checked ${timeAgo(link.lastCheckedAt) || ''} · click to check again">
+          <span class="health-dot"></span>${label}
+        </button>`;
   }
 
   function buildCardEl(link) {
@@ -597,16 +630,10 @@
     const favicon = faviconFor(link.url);
     const tags = link.tags || [];
 
-    const healthBadge = link.linkStatus
-      ? `<button type="button" class="link-health-badge" data-status="${link.linkStatus}" data-action="check-one" data-id="${link.id}" title="${link.linkStatus === 'ok' ? 'Link acessível' : 'Link pode estar em baixo'}${link.linkStatusCode ? ' (HTTP ' + link.linkStatusCode + ')' : ''} · verificado ${timeAgo(link.lastCheckedAt) || ''} · clica para verificar de novo">
-          <span class="health-dot"></span>${link.linkStatus === 'ok' ? 'ok' : 'quebrado'}
-        </button>`
-      : `<button type="button" class="link-health-badge" data-status="unchecked" data-action="check-one" data-id="${link.id}" title="Ainda não verificado — clica para verificar">
-          <span class="health-dot"></span>por verificar
-        </button>`;
+    const healthBadge = buildHealthBadge(link);
 
     li.innerHTML = `
-      <span class="drag-handle" title="Arrastar para reordenar">⠿</span>
+      <span class="drag-handle" title="Drag to reorder">⠿</span>
       <div class="link-favicon">${favicon ? `<img src="${favicon}" alt="" loading="lazy" onerror="this.parentElement.textContent='◈'">` : '◈'}</div>
       <div class="link-body">
         <div class="link-title-row">
@@ -617,13 +644,13 @@
         <a class="link-url" href="${escapeHtml(link.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(hostnameFor(link.url))}</a>
         ${link.description ? `<p class="link-notes">${escapeHtml(link.description)}</p>` : ''}
         ${tags.length ? `<div class="link-tags">${tags.map(t => `<button type="button" class="link-tag" data-action="filter-tag" data-tag="${escapeHtml(t)}">${escapeHtml(t)}</button>`).join('')}</div>` : ''}
-        <p class="link-meta">adicionado em ${formatDate(link.createdAt)}</p>
+        <p class="link-meta">added on ${formatDate(link.createdAt)}</p>
       </div>
       <div class="link-actions">
-        <button class="icon-btn fav-btn${link.favorite ? ' active' : ''}" title="Alternar favorito" data-action="favorite" data-id="${link.id}">★</button>
-        <button class="icon-btn" title="Copiar URL" data-action="copy" data-id="${link.id}">⧉</button>
-        <button class="icon-btn" title="Editar" data-action="edit" data-id="${link.id}">✎</button>
-        <button class="icon-btn danger" title="Remover" data-action="delete" data-id="${link.id}">✕</button>
+        <button class="icon-btn fav-btn${link.favorite ? ' active' : ''}" title="Toggle favorite" data-action="favorite" data-id="${link.id}">★</button>
+        <button class="icon-btn" title="Copy URL" data-action="copy" data-id="${link.id}">⧉</button>
+        <button class="icon-btn" title="Edit" data-action="edit" data-id="${link.id}">✎</button>
+        <button class="icon-btn danger" title="Remove" data-action="delete" data-id="${link.id}">✕</button>
       </div>
     `;
     return li;
@@ -653,7 +680,7 @@
     if (action === 'edit' && link) enterEditMode(link);
     if (action === 'favorite') toggleFavorite(id);
     if (action === 'copy' && link) {
-      navigator.clipboard.writeText(link.url).then(() => showToast('URL copiado!'));
+      navigator.clipboard.writeText(link.url).then(() => showToast('URL copied!'));
     }
     if (action === 'filter-tag') {
       const tag = btn.dataset.tag;
@@ -707,34 +734,41 @@
   function toggleTheme() {
     const isDark = document.body.dataset.theme === 'dark';
     document.body.dataset.theme = isDark ? '' : 'dark';
-    try { localStorage.setItem('nos-theme', isDark ? 'light' : 'dark'); } catch {}
+    try { localStorage.setItem('nodes-theme', isDark ? 'light' : 'dark'); } catch {}
   }
 
   function toggleView() {
     viewMode = viewMode === 'list' ? 'grid' : 'list';
-    try { localStorage.setItem('nos-view-mode', viewMode); } catch {}
+    try { localStorage.setItem('nodes-view-mode', viewMode); } catch {}
     btnToggleView.textContent = viewMode === 'list' ? '⊞' : '≡';
     renderList();
   }
 
   function toggleDensity() {
     density = density === 'comfortable' ? 'compact' : 'comfortable';
-    try { localStorage.setItem('nos-density', density); } catch {}
+    try { localStorage.setItem('nodes-density', density); } catch {}
     renderList();
   }
 
-  // ---------- Verificação de links mortos ----------
+  // ---------- Dead link checking ----------
 
   async function checkOneLink(link, btnEl) {
     const original = btnEl.innerHTML;
     btnEl.disabled = true;
-    btnEl.innerHTML = '<span class="health-dot"></span>a verificar…';
+    btnEl.innerHTML = '<span class="health-dot"></span>checking…';
     try {
       const updated = await apiCheckOne(link.id);
       const idx = links.findIndex(l => l.id === link.id);
       if (idx !== -1) links[idx] = updated;
       renderList();
-      showToast(updated.linkStatus === 'ok' ? 'Link acessível' : 'Link parece estar em baixo', updated.linkStatus === 'ok' ? 'success' : 'error');
+
+      const isBlocked = updated.linkStatus === 'broken' && BLOCKED_STATUS_CODES.has(updated.linkStatusCode);
+      const message = updated.linkStatus === 'ok'
+        ? 'Link is reachable'
+        : isBlocked
+          ? `Request was blocked (HTTP ${updated.linkStatusCode}) — the site may still be online`
+          : 'Link seems to be down';
+      showToast(message, updated.linkStatus === 'ok' ? 'success' : 'error');
     } catch (err) {
       showToast(err.message, 'error');
       btnEl.disabled = false;
@@ -748,7 +782,7 @@
     try {
       const { inProgress } = await apiCheckStatus();
       if (inProgress) {
-        showToast('Já há uma verificação em curso', 'error');
+        showToast('A check is already in progress', 'error');
         startCheckPolling();
         return;
       }
@@ -756,12 +790,12 @@
 
     btnCheckLinks.disabled = true;
     checkProgress.classList.remove('hidden');
-    checkProgressText.textContent = 'A verificar links…';
+    checkProgressText.textContent = 'Checking links…';
 
     try {
       await apiCheckAll();
       await refresh();
-      showToast('Verificação concluída', 'success');
+      showToast('Check complete', 'success');
     } catch (err) {
       showToast(err.message, 'error');
     } finally {
@@ -791,7 +825,7 @@
     }, 4000);
   }
 
-  // ---------- Drag & drop (reordenar manualmente) ----------
+  // ---------- Drag & drop (manual reordering) ----------
 
   let dragSourceId = null;
 
@@ -841,7 +875,7 @@
       const rect = targetCard.getBoundingClientRect();
       const isAfter = e.clientY > rect.top + rect.height / 2;
 
-      // Reordena renderedIds localmente para feedback imediato
+      // Reorder renderedIds locally for immediate feedback
       const fromIdx = renderedIds.indexOf(dragSourceId);
       let toIdx = renderedIds.indexOf(targetCard.dataset.id);
       if (fromIdx === -1 || toIdx === -1) return;
@@ -850,7 +884,7 @@
       toIdx = renderedIds.indexOf(targetCard.dataset.id);
       renderedIds.splice(isAfter ? toIdx + 1 : toIdx, 0, dragSourceId);
 
-      // Re-renderiza a lista visível na nova ordem imediatamente
+      // Re-render the visible list in the new order immediately
       linkListEl.innerHTML = '';
       renderedIds.forEach(id => {
         const link = links.find(l => l.id === id);
@@ -859,19 +893,19 @@
 
       try {
         await apiReorder(renderedIds);
-        // Atualiza o campo `order` localmente para refletir a nova posição
+        // Update the `order` field locally to reflect the new position
         renderedIds.forEach((id, i) => {
           const link = links.find(l => l.id === id);
           if (link) link.order = i;
         });
       } catch (err) {
-        showToast('Erro ao guardar ordem — a recarregar', 'error');
+        showToast('Error saving order — reloading', 'error');
         await refresh();
       }
     });
   }
 
-  // ---------- Preview on-hover (Open Graph) ----------
+  // ---------- Preview on hover (Open Graph) ----------
 
   let previewHoverTimer = null;
   let previewRequestToken = 0;
@@ -916,7 +950,7 @@
 
     try {
       const data = await apiPreview(link.url);
-      if (myToken !== previewRequestToken) return; // já mudou de alvo — ignora resposta antiga
+      if (myToken !== previewRequestToken) return; // target already changed — ignore stale response
 
       previewLoading.classList.add('hidden');
 
@@ -942,14 +976,14 @@
   }
 
   function hidePreview() {
-    previewRequestToken++; // invalida qualquer pedido pendente
+    previewRequestToken++; // invalidate any pending request
     linkPreviewEl.classList.remove('visible');
     setTimeout(() => {
       if (!linkPreviewEl.classList.contains('visible')) linkPreviewEl.classList.add('hidden');
     }, 150);
   }
 
-  // ---------- Importação ----------
+  // ---------- Import ----------
 
   function openImportModal() {
     importOverlay.classList.remove('hidden');
@@ -981,7 +1015,7 @@
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result);
-      reader.onerror = () => reject(new Error('Não foi possível ler o ficheiro'));
+      reader.onerror = () => reject(new Error('Could not read the file'));
       reader.readAsText(file);
     });
   }
@@ -996,27 +1030,27 @@
     try {
       if (isBookmarksTab) {
         const file = fileBookmarks.files[0];
-        if (!file) throw new Error('Escolhe um ficheiro .html de bookmarks primeiro.');
+        if (!file) throw new Error('Choose a bookmarks .html file first.');
         const html = await readFileAsText(file);
         const defaultTags = importTagsBookmarks.value.split(',').map(t => t.trim()).filter(Boolean);
         const result = await apiImportBookmarks(html, defaultTags);
-        importResult.textContent = `${result.imported} nó(s) importado(s), ${result.skipped} já existia(m).`;
+        importResult.textContent = `${result.imported} node(s) imported, ${result.skipped} already existed.`;
         importResult.classList.remove('hidden');
       } else {
         const file = fileJson.files[0];
-        if (!file) throw new Error('Escolhe um ficheiro .json primeiro.');
+        if (!file) throw new Error('Choose a .json file first.');
         const raw = await readFileAsText(file);
         let parsed;
         try {
           parsed = JSON.parse(raw);
         } catch {
-          throw new Error('O ficheiro não é um JSON válido.');
+          throw new Error('The file is not valid JSON.');
         }
         const items = Array.isArray(parsed) ? parsed : (Array.isArray(parsed.items) ? parsed.items : null);
-        if (!items) throw new Error('Formato inesperado — esperava um array de links.');
+        if (!items) throw new Error('Unexpected format — expected an array of links.');
         const defaultTags = importTagsJson.value.split(',').map(t => t.trim()).filter(Boolean);
         const result = await apiImportJson(items, defaultTags);
-        importResult.textContent = `${result.imported} nó(s) importado(s), ${result.skipped} já existia(m), ${result.invalid} inválido(s).`;
+        importResult.textContent = `${result.imported} node(s) imported, ${result.skipped} already existed, ${result.invalid} invalid.`;
         importResult.classList.remove('hidden');
       }
       await refresh();
@@ -1028,11 +1062,11 @@
     }
   }
 
-  // ---------- Estatísticas ----------
+  // ---------- Statistics ----------
 
   async function openStatsModal() {
     statsOverlay.classList.remove('hidden');
-    statsContent.innerHTML = '<p class="import-hint">A carregar…</p>';
+    statsContent.innerHTML = '<p class="import-hint">Loading…</p>';
     try {
       const stats = await apiStats();
       statsContent.innerHTML = renderStatsHtml(stats);
@@ -1055,7 +1089,7 @@
         <span class="stat-bar-track"><span class="stat-bar-fill" style="width:${(t.count / maxTag) * 100}%"></span></span>
         <span class="stat-bar-count">${t.count}</span>
       </div>
-    `).join('') || '<p class="import-hint">Ainda sem tags.</p>';
+    `).join('') || '<p class="import-hint">No tags yet.</p>';
 
     const domainBars = stats.topDomains.map(d => `
       <div class="stat-bar-row">
@@ -1063,17 +1097,17 @@
         <span class="stat-bar-track"><span class="stat-bar-fill" style="width:${(d.count / maxDomain) * 100}%"></span></span>
         <span class="stat-bar-count">${d.count}</span>
       </div>
-    `).join('') || '<p class="import-hint">Sem dados.</p>';
+    `).join('') || '<p class="import-hint">No data.</p>';
 
     return `
       <div class="stats-grid">
         <div class="stat-tile">
           <div class="stat-value">${stats.total}</div>
-          <div class="stat-label">Total de links</div>
+          <div class="stat-label">Total nodes</div>
         </div>
         <div class="stat-tile">
           <div class="stat-value">${stats.favorites}</div>
-          <div class="stat-label">Favoritos</div>
+          <div class="stat-label">Favorites</div>
         </div>
         <div class="stat-tile">
           <div class="stat-value">${stats.totalTags}</div>
@@ -1081,35 +1115,35 @@
         </div>
         <div class="stat-tile">
           <div class="stat-value">${stats.linkHealth.ok}</div>
-          <div class="stat-label">Online</div>
+          <div class="stat-label">Links ok</div>
         </div>
         <div class="stat-tile stat-broken">
           <div class="stat-value">${stats.linkHealth.broken}</div>
-          <div class="stat-label">Offline</div>
+          <div class="stat-label">Broken</div>
         </div>
       </div>
 
       <div class="stats-section">
-        <h4>Tags mais usadas</h4>
+        <h4>Most used tags</h4>
         ${tagBars}
       </div>
 
       <div class="stats-section">
-        <h4>Domínios mais guardados</h4>
+        <h4>Most saved domains</h4>
         ${domainBars}
       </div>
     `;
   }
 
-  // ---------- Duplicados ----------
+  // ---------- Duplicates ----------
 
   async function openDuplicatesModal() {
     duplicatesOverlay.classList.remove('hidden');
-    duplicatesContent.innerHTML = '<p class="import-hint">A procurar duplicados…</p>';
+    duplicatesContent.innerHTML = '<p class="import-hint">Looking for duplicates…</p>';
     try {
       const groups = await apiDuplicates();
       if (groups.length === 0) {
-        duplicatesContent.innerHTML = '<p class="import-hint">Nenhum nó duplicado encontrado. 🎉</p>';
+        duplicatesContent.innerHTML = '<p class="import-hint">No duplicate nodes found. 🎉</p>';
         return;
       }
       duplicatesContent.innerHTML = groups.map(group => `
@@ -1119,7 +1153,7 @@
             <div class="duplicate-item">
               <span class="duplicate-item-title">${escapeHtml(l.title)}</span>
               <span class="duplicate-item-date">${formatDate(l.createdAt)}</span>
-              <button class="icon-btn danger" data-action="delete-duplicate" data-id="${l.id}" title="Remover este">✕</button>
+              <button class="icon-btn danger" data-action="delete-duplicate" data-id="${l.id}" title="Remove this one">✕</button>
             </div>
           `).join('')}
         </div>
@@ -1138,7 +1172,7 @@
     if (!btn) return;
     try {
       await apiDelete(btn.dataset.id);
-      showToast('Nó removido', 'success');
+      showToast('Node removed', 'success');
       await refresh();
       await openDuplicatesModal();
     } catch (err) {
@@ -1150,7 +1184,7 @@
 
   async function init() {
     let savedTheme = null;
-    try { savedTheme = localStorage.getItem('nos-theme'); } catch {}
+    try { savedTheme = localStorage.getItem('nodes-theme'); } catch {}
     if (savedTheme === 'dark' || savedTheme === null) document.body.dataset.theme = 'dark';
 
     btnToggleView.textContent = viewMode === 'list' ? '⊞' : '≡';
@@ -1158,8 +1192,8 @@
     attachDragHandlers();
     setupPreviewHover();
 
-    // Scroll infinito simples: observa o fim da página em vez de um sentinel por item,
-    // suficiente para a maioria dos ecrãs e evita reconstruir o observer a cada render.
+    // Simple infinite scroll: watches the end of the page instead of a per-item
+    // sentinel, which is enough for most screens and avoids rebuilding the observer on every render.
     window.addEventListener('scroll', () => {
       const nearBottom = window.innerHeight + window.scrollY >= document.body.offsetHeight - 600;
       if (!nearBottom) return;
@@ -1191,7 +1225,7 @@
 
     await refresh();
 
-    // Se já houver uma verificação em curso no arranque do servidor, mostra o indicador
+    // If a check is already in progress at server startup, show the indicator
     try {
       const { inProgress } = await apiCheckStatus();
       if (inProgress) startCheckPolling();

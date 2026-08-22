@@ -8,12 +8,12 @@ const PORT = process.env.PORT || 3000;
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 const DATA_FILE = path.join(DATA_DIR, 'links.json');
 const BACKUP_DIR = path.join(DATA_DIR, 'backups');
-const BACKUP_RETENTION = parseInt(process.env.BACKUP_RETENTION || '14', 10); // dias/cópias a manter
+const BACKUP_RETENTION = parseInt(process.env.BACKUP_RETENTION || '14', 10); // number of daily backups to keep
 const LINK_CHECK_INTERVAL_MS = parseInt(process.env.LINK_CHECK_INTERVAL_HOURS || '24', 10) * 60 * 60 * 1000;
 const LINK_CHECK_TIMEOUT_MS = 8000;
 const OG_FETCH_TIMEOUT_MS = 6000;
 
-// Garante que as pastas e o ficheiro existem
+// Make sure the folders and the data file exist
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 if (!fs.existsSync(BACKUP_DIR)) fs.mkdirSync(BACKUP_DIR, { recursive: true });
 if (!fs.existsSync(DATA_FILE)) fs.writeFileSync(DATA_FILE, '[]', 'utf-8');
@@ -21,13 +21,13 @@ if (!fs.existsSync(DATA_FILE)) fs.writeFileSync(DATA_FILE, '[]', 'utf-8');
 app.use(express.json({ limit: '5mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// --- Helpers de persistência ---
+// --- Persistence helpers ---
 function readLinks() {
   try {
     const raw = fs.readFileSync(DATA_FILE, 'utf-8');
     return JSON.parse(raw || '[]');
   } catch (err) {
-    console.error('Erro ao ler links.json:', err);
+    console.error('Error reading links.json:', err);
     return [];
   }
 }
@@ -56,7 +56,7 @@ function normalizeUrlForCompare(url) {
   }
 }
 
-// Garante que todos os links têm um campo `order` coerente (migração suave)
+// Makes sure every link has a consistent `order` field (soft migration)
 function ensureOrder(links) {
   let changed = false;
   links.forEach((l, i) => {
@@ -72,13 +72,13 @@ function ensureOrder(links) {
 function createBackup() {
   try {
     const links = readLinks();
-    if (links.length === 0) return; // nada a preservar
+    if (links.length === 0) return; // nothing to preserve
     const ts = new Date().toISOString().replace(/[:.]/g, '-');
     const backupFile = path.join(BACKUP_DIR, `links-${ts}.json`);
     fs.writeFileSync(backupFile, JSON.stringify(links, null, 2), 'utf-8');
     rotateBackups();
   } catch (err) {
-    console.error('Erro ao criar backup:', err);
+    console.error('Error creating backup:', err);
   }
 }
 
@@ -93,7 +93,7 @@ function rotateBackups() {
       fs.unlinkSync(path.join(BACKUP_DIR, f.name));
     });
   } catch (err) {
-    console.error('Erro ao rodar backups:', err);
+    console.error('Error rotating backups:', err);
   }
 }
 
@@ -111,15 +111,27 @@ function listBackups() {
   }
 }
 
-// --- Verificação de links mortos ---
+// --- Dead link checking ---
+
+// A realistic browser User-Agent avoids false positives: many sites (Cloudflare,
+// WAFs, anti-scraping protections) return 403 to requests with no User-Agent or an
+// obviously non-browser one, even though the site is perfectly online.
+const CHECK_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+
 async function checkLinkStatus(url) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), LINK_CHECK_TIMEOUT_MS);
+  const commonHeaders = {
+    'User-Agent': CHECK_USER_AGENT,
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    'Accept-Language': 'en-US,en;q=0.9',
+  };
   try {
-    let res = await fetch(url, { method: 'HEAD', redirect: 'follow', signal: controller.signal });
-    // Alguns servidores não suportam HEAD corretamente; tenta GET como fallback
-    if (res.status === 405 || res.status === 501) {
-      res = await fetch(url, { method: 'GET', redirect: 'follow', signal: controller.signal });
+    let res = await fetch(url, { method: 'HEAD', redirect: 'follow', signal: controller.signal, headers: commonHeaders });
+    // Some servers don't support HEAD correctly, or block it specifically
+    // (some WAFs treat HEAD as suspicious) — retry with GET before giving up.
+    if ([403, 405, 406, 501].includes(res.status)) {
+      res = await fetch(url, { method: 'GET', redirect: 'follow', signal: controller.signal, headers: commonHeaders });
     }
     clearTimeout(timeout);
     return { status: res.ok ? 'ok' : 'broken', statusCode: res.status, checkedAt: new Date().toISOString() };
@@ -131,8 +143,8 @@ async function checkLinkStatus(url) {
 
 async function checkAllLinks() {
   const links = readLinks();
-  console.log(`[link-check] a verificar ${links.length} links...`);
-  // Corre em lotes pequenos para não disparar dezenas de pedidos em simultâneo
+  console.log(`[link-check] checking ${links.length} links...`);
+  // Runs in small batches so it doesn't fire dozens of requests at once
   const BATCH_SIZE = 5;
   for (let i = 0; i < links.length; i += BATCH_SIZE) {
     const batch = links.slice(i, i + BATCH_SIZE);
@@ -140,15 +152,16 @@ async function checkAllLinks() {
     batch.forEach((l, idx) => {
       l.linkStatus = results[idx].status;
       l.linkStatusCode = results[idx].statusCode;
+      l.linkStatusError = results[idx].error || null;
       l.lastCheckedAt = results[idx].checkedAt;
     });
   }
   writeLinks(links);
-  console.log('[link-check] concluído');
+  console.log('[link-check] done');
   return links;
 }
 
-// --- Open Graph scraping (leve, via regex — sem dependências extra) ---
+// --- Open Graph scraping (lightweight, regex-based — no extra dependencies) ---
 function extractMeta(html, property) {
   const patterns = [
     new RegExp(`<meta[^>]+property=["']${property}["'][^>]+content=["']([^"']*)["']`, 'i'),
@@ -172,7 +185,7 @@ async function fetchOgData(url) {
   try {
     const res = await fetch(url, {
       signal: controller.signal,
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; NosLinkManager/1.0)' },
+      headers: { 'User-Agent': CHECK_USER_AGENT },
     });
     clearTimeout(timeout);
     if (!res.ok) return null;
@@ -180,7 +193,7 @@ async function fetchOgData(url) {
     const contentType = res.headers.get('content-type') || '';
     if (!contentType.includes('text/html')) return null;
 
-    // Só lê os primeiros ~100KB — suficiente para o <head> na esmagadora maioria dos sites
+    // Only reads the first ~100KB — enough for the <head> on the vast majority of sites
     const reader = res.body.getReader();
     let html = '';
     let bytesRead = 0;
@@ -207,9 +220,9 @@ async function fetchOgData(url) {
   }
 }
 
-// Cache simples em memória para não voltar a buscar OG data repetidamente na mesma sessão
+// Simple in-memory cache so we don't re-fetch OG data repeatedly in the same session
 const ogCache = new Map();
-const OG_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hora
+const OG_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 
 async function getOgDataCached(url) {
   const cached = ogCache.get(url);
@@ -221,7 +234,7 @@ async function getOgDataCached(url) {
   return data;
 }
 
-// --- Importação: bookmarks HTML (Netscape Bookmark format, usado por Chrome/Firefox) ---
+// --- Import: HTML bookmarks (Netscape Bookmark format, used by Chrome/Firefox) ---
 function parseBookmarksHtml(html) {
   const results = [];
   const linkRe = /<A[^>]+HREF="([^"]+)"[^>]*>([^<]*)<\/A>/gi;
@@ -230,7 +243,7 @@ function parseBookmarksHtml(html) {
     const url = match[1];
     const title = match[2].trim();
     if (!isValidUrl(url)) continue;
-    // Tenta extrair TAGS="..." se presente (Firefox exporta isto)
+    // Try to extract TAGS="..." if present (Firefox exports this)
     const fullTag = match[0];
     const tagsMatch = fullTag.match(/TAGS="([^"]*)"/i);
     const tags = tagsMatch ? tagsMatch[1].split(',').map(t => t.trim()).filter(Boolean) : [];
@@ -240,13 +253,13 @@ function parseBookmarksHtml(html) {
 }
 
 
-// --- Rotas da API ---
+// --- API routes ---
 
-// IMPORTANTE: rotas com segmento fixo (ex: /api/links/reorder) têm de vir
-// antes de rotas com parâmetro (ex: /api/links/:id), senão o Express interpreta
-// o segmento fixo como um valor de :id.
+// IMPORTANT: routes with a fixed segment (e.g. /api/links/reorder) must come
+// before routes with a parameter (e.g. /api/links/:id), otherwise Express
+// interprets the fixed segment as an :id value.
 
-// Listar todos os links (com filtros opcionais via query params)
+// List all links (with optional filters via query params)
 app.get('/api/links', (req, res) => {
   let links = readLinks();
   if (ensureOrder(links)) writeLinks(links);
@@ -271,16 +284,16 @@ app.get('/api/links', (req, res) => {
     links = links.filter(l => l.favorite === true);
   }
 
-  // Ordem manual (drag-and-drop) é a ordem base; o frontend reordena depois consoante o sort escolhido
+  // Manual order (drag-and-drop) is the base order; the frontend re-sorts based on the chosen sort mode
   links.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 
   res.json(links);
 });
 
-// Verificar se uma URL já existe na coleção (deteção de duplicados)
+// Check whether a URL already exists in the collection (duplicate detection)
 app.get('/api/links/check-duplicate', (req, res) => {
   const { url, excludeId } = req.query;
-  if (!url) return res.status(400).json({ error: 'Falta o parâmetro url' });
+  if (!url) return res.status(400).json({ error: 'Missing url parameter' });
 
   const links = readLinks();
   const normalized = normalizeUrlForCompare(url);
@@ -289,7 +302,7 @@ app.get('/api/links/check-duplicate', (req, res) => {
   res.json({ duplicate: !!match, existing: match || null });
 });
 
-// Listar todos os grupos de duplicados existentes na coleção
+// List all existing duplicate groups in the collection
 app.get('/api/duplicates', (req, res) => {
   const links = readLinks();
   const groups = new Map();
@@ -304,32 +317,32 @@ app.get('/api/duplicates', (req, res) => {
   res.json(duplicateGroups);
 });
 
-// Estado da verificação de links em curso (tem de vir antes de /:id/check)
+// Status of an in-progress link check (must come before /:id/check)
 app.get('/api/links/check-status', (req, res) => {
   res.json({ inProgress: checkInProgress });
 });
 
-// Verificar todos os links (pode demorar — corre em lotes)
+// Check all links (can take a while — runs in batches)
 app.post('/api/links/check-all', async (req, res) => {
   if (checkInProgress) {
-    return res.status(409).json({ error: 'Já existe uma verificação em curso' });
+    return res.status(409).json({ error: 'A check is already in progress' });
   }
   checkInProgress = true;
   try {
     const links = await checkAllLinks();
     res.json({ checked: links.length, links });
   } catch (err) {
-    res.status(500).json({ error: 'Erro ao verificar links' });
+    res.status(500).json({ error: 'Error checking links' });
   } finally {
     checkInProgress = false;
   }
 });
 
-// Reordenar links (drag-and-drop) — recebe a lista de IDs na nova ordem desejada
+// Reorder links (drag-and-drop) — receives the list of IDs in the desired new order
 app.put('/api/links/reorder', (req, res) => {
   const { orderedIds } = req.body;
   if (!Array.isArray(orderedIds)) {
-    return res.status(400).json({ error: 'orderedIds deve ser um array de IDs' });
+    return res.status(400).json({ error: 'orderedIds must be an array of IDs' });
   }
 
   const links = readLinks();
@@ -344,38 +357,39 @@ app.put('/api/links/reorder', (req, res) => {
   res.json({ success: true });
 });
 
-// Obter um link específico
+// Get a specific link
 app.get('/api/links/:id', (req, res) => {
   const links = readLinks();
   const link = links.find(l => l.id === req.params.id);
-  if (!link) return res.status(404).json({ error: 'Link não encontrado' });
+  if (!link) return res.status(404).json({ error: 'Link not found' });
   res.json(link);
 });
 
-// Verificar um único link (tem de vir depois de /check-all e /check-status para não colidir)
+// Check a single link (must come after /check-all and /check-status to avoid collision)
 app.post('/api/links/:id/check', async (req, res) => {
   const links = readLinks();
   const idx = links.findIndex(l => l.id === req.params.id);
-  if (idx === -1) return res.status(404).json({ error: 'Link não encontrado' });
+  if (idx === -1) return res.status(404).json({ error: 'Link not found' });
 
   const result = await checkLinkStatus(links[idx].url);
   links[idx].linkStatus = result.status;
   links[idx].linkStatusCode = result.statusCode;
+  links[idx].linkStatusError = result.error || null;
   links[idx].lastCheckedAt = result.checkedAt;
   writeLinks(links);
 
   res.json(links[idx]);
 });
 
-// Criar novo link
+// Create a new link
 app.post('/api/links', (req, res) => {
   const { title, url, description, tags, favorite } = req.body;
 
   if (!title || !title.trim()) {
-    return res.status(400).json({ error: 'O título é obrigatório' });
+    return res.status(400).json({ error: 'Title is required' });
   }
   if (!url || !isValidUrl(url)) {
-    return res.status(400).json({ error: 'URL inválido. Usa http:// ou https://' });
+    return res.status(400).json({ error: 'Invalid URL. Use http:// or https://' });
   }
 
   const links = readLinks();
@@ -392,6 +406,7 @@ app.post('/api/links', (req, res) => {
     order: maxOrder + 1,
     linkStatus: null,
     linkStatusCode: null,
+    linkStatusError: null,
     lastCheckedAt: null,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -402,24 +417,25 @@ app.post('/api/links', (req, res) => {
   res.status(201).json(newLink);
 });
 
-// Editar link existente
+// Edit an existing link
 app.put('/api/links/:id', (req, res) => {
   const links = readLinks();
   const idx = links.findIndex(l => l.id === req.params.id);
-  if (idx === -1) return res.status(404).json({ error: 'Link não encontrado' });
+  if (idx === -1) return res.status(404).json({ error: 'Link not found' });
 
   const { title, url, description, tags, favorite } = req.body;
 
   if (title !== undefined) {
-    if (!title.trim()) return res.status(400).json({ error: 'O título é obrigatório' });
+    if (!title.trim()) return res.status(400).json({ error: 'Title is required' });
     links[idx].title = title.trim();
   }
   if (url !== undefined) {
-    if (!isValidUrl(url)) return res.status(400).json({ error: 'URL inválido. Usa http:// ou https://' });
+    if (!isValidUrl(url)) return res.status(400).json({ error: 'Invalid URL. Use http:// or https://' });
     links[idx].url = url.trim();
-    // Muda a URL -> o estado de verificação anterior deixa de ser válido
+    // URL changed -> the previous check status is no longer valid
     links[idx].linkStatus = null;
     links[idx].linkStatusCode = null;
+    links[idx].linkStatusError = null;
     links[idx].lastCheckedAt = null;
   }
   if (description !== undefined) links[idx].description = description.trim();
@@ -432,18 +448,18 @@ app.put('/api/links/:id', (req, res) => {
   res.json(links[idx]);
 });
 
-// Apagar link
+// Delete a link
 app.delete('/api/links/:id', (req, res) => {
   const links = readLinks();
   const idx = links.findIndex(l => l.id === req.params.id);
-  if (idx === -1) return res.status(404).json({ error: 'Link não encontrado' });
+  if (idx === -1) return res.status(404).json({ error: 'Link not found' });
 
   const [removed] = links.splice(idx, 1);
   writeLinks(links);
   res.json(removed);
 });
 
-// Listar todas as tags existentes (útil para filtros no frontend)
+// List all existing tags (useful for filters on the frontend)
 app.get('/api/tags', (req, res) => {
   const links = readLinks();
   const tagSet = new Set();
@@ -455,25 +471,25 @@ app.get('/api/tags', (req, res) => {
 app.get('/api/preview', async (req, res) => {
   const { url } = req.query;
   if (!url || !isValidUrl(url)) {
-    return res.status(400).json({ error: 'URL inválido' });
+    return res.status(400).json({ error: 'Invalid URL' });
   }
   const data = await getOgDataCached(url);
-  if (!data) return res.status(502).json({ error: 'Não foi possível obter preview' });
+  if (!data) return res.status(502).json({ error: 'Could not fetch preview' });
   res.json(data);
 });
 
-// --- Importação ---
+// --- Import ---
 
-// Importar a partir de bookmarks HTML (Netscape Bookmark format)
+// Import from HTML bookmarks (Netscape Bookmark format)
 app.post('/api/import/bookmarks', (req, res) => {
   const { html, defaultTags } = req.body;
   if (!html || typeof html !== 'string') {
-    return res.status(400).json({ error: 'Falta o conteúdo HTML dos bookmarks' });
+    return res.status(400).json({ error: 'Missing bookmarks HTML content' });
   }
 
   const parsed = parseBookmarksHtml(html);
   if (parsed.length === 0) {
-    return res.status(400).json({ error: 'Nenhum bookmark válido encontrado no ficheiro' });
+    return res.status(400).json({ error: 'No valid bookmarks found in the file' });
   }
 
   const links = readLinks();
@@ -503,6 +519,7 @@ app.post('/api/import/bookmarks', (req, res) => {
       order: maxOrder,
       linkStatus: null,
       linkStatusCode: null,
+      linkStatusError: null,
       lastCheckedAt: null,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -515,11 +532,11 @@ app.post('/api/import/bookmarks', (req, res) => {
   res.json({ imported: imported.length, skipped: skipped.length, links: imported });
 });
 
-// Importar a partir de um links.json (desta app ou de outra instância)
+// Import from a links.json file (from this app or another instance)
 app.post('/api/import/json', (req, res) => {
   const { items, defaultTags } = req.body;
   if (!Array.isArray(items)) {
-    return res.status(400).json({ error: 'O corpo deve conter um array "items"' });
+    return res.status(400).json({ error: 'Request body must contain an "items" array' });
   }
 
   const links = readLinks();
@@ -554,6 +571,7 @@ app.post('/api/import/json', (req, res) => {
       order: maxOrder,
       linkStatus: null,
       linkStatusCode: null,
+      linkStatusError: null,
       lastCheckedAt: null,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -580,21 +598,21 @@ app.post('/api/backups/:file/restore', (req, res) => {
   const file = req.params.file;
   const filePath = path.join(BACKUP_DIR, file);
   if (!file.startsWith('links-') || !file.endsWith('.json') || !fs.existsSync(filePath)) {
-    return res.status(404).json({ error: 'Backup não encontrado' });
+    return res.status(404).json({ error: 'Backup not found' });
   }
   try {
-    // Faz backup do estado atual antes de restaurar, por segurança
+    // Backs up the current state before restoring, for safety
     createBackup();
     const raw = fs.readFileSync(filePath, 'utf-8');
     const restoredLinks = JSON.parse(raw);
     writeLinks(restoredLinks);
     res.json({ success: true, count: restoredLinks.length });
   } catch (err) {
-    res.status(500).json({ error: 'Erro ao restaurar backup' });
+    res.status(500).json({ error: 'Error restoring backup' });
   }
 });
 
-// --- Estatísticas ---
+// --- Statistics ---
 app.get('/api/stats', (req, res) => {
   const links = readLinks();
   const tagCounts = new Map();
@@ -648,7 +666,7 @@ app.get('/api/stats', (req, res) => {
   });
 });
 
-// Health check (útil para Docker healthcheck)
+// Health check (used by the Docker healthcheck)
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
 });
@@ -656,20 +674,20 @@ app.get('/api/health', (req, res) => {
 let checkInProgress = false;
 
 app.listen(PORT, () => {
-  console.log(`Nós — Gestor de Links a correr em http://localhost:${PORT}`);
+  console.log(`Nodes — Link Manager running at http://localhost:${PORT}`);
 
-  // Backup ao arrancar, e depois periodicamente (diário)
+  // Backup at startup, then periodically (daily)
   createBackup();
   setInterval(createBackup, 24 * 60 * 60 * 1000);
 
-  // Verificação de links mortos ao arrancar (com atraso, para não atrasar o boot) e depois periodicamente
+  // Dead link check at startup (delayed, so it doesn't slow down boot), then periodically
   setTimeout(() => {
     checkInProgress = true;
-    checkAllLinks().catch(err => console.error('[link-check] erro:', err)).finally(() => { checkInProgress = false; });
+    checkAllLinks().catch(err => console.error('[link-check] error:', err)).finally(() => { checkInProgress = false; });
   }, 15_000);
   setInterval(() => {
     if (checkInProgress) return;
     checkInProgress = true;
-    checkAllLinks().catch(err => console.error('[link-check] erro:', err)).finally(() => { checkInProgress = false; });
+    checkAllLinks().catch(err => console.error('[link-check] error:', err)).finally(() => { checkInProgress = false; });
   }, LINK_CHECK_INTERVAL_MS);
 });

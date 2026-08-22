@@ -10,5 +10,5 @@ services:
     environment:
       - PORT=3000
       - DATA_DIR=/app/data
-      # - BACKUP_RETENTION=14           # nº de backups diários a manter (default: 14)
-      # - LINK_CHECK_INTERVAL_HOURS=24  # frequência da verificação automática de links (default: 24h)
+      # - BACKUP_RETENTION=14           # number of daily backups to keep (default: 14)
+      # - LINK_CHECK_INTERVAL_HOURS=24  # how often automatic link checking runs (default: 24h)

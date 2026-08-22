@@ -1,135 +1,135 @@
-# Nós — Gestor de Links
+# Nodes — Link Manager
 
-Aplicação web para gerir uma coleção pessoal de links ("nós"): adicionar, editar, apagar, pesquisar, filtrar, reordenar por arrastar, importar de outras fontes, verificar links quebrados e consultar estatísticas. Frontend em HTML5/CSS/JS puro, backend em Node.js + Express, dados persistidos em JSON num volume Docker com backup automático.
+A web app for managing a personal collection of links ("nodes"): add, edit, delete, search, filter, drag-to-reorder, import from other sources, check for broken links, and view statistics. Frontend in plain HTML5/CSS/JS, backend in Node.js + Express, data persisted as JSON in a Docker volume with automatic backups.
 
-## Arrancar com Docker (recomendado)
+## Start with Docker (recommended)
 
-Pré-requisito: Docker e Docker Compose instalados.
+Prerequisite: Docker and Docker Compose installed.
 
 ```bash
 docker compose up -d --build
 ```
 
-A aplicação fica disponível em **http://localhost:3000**.
+The app will be available at **http://localhost:3000**.
 
-Para parar:
+To stop it:
 
 ```bash
 docker compose down
 ```
 
-Os dados ficam guardados na pasta `./data/` no teu computador (mapeada como volume), por isso sobrevivem a reinícios e rebuilds do container.
+Data is stored in the `./data/` folder on your machine (mapped as a volume), so it survives restarts and rebuilds of the container.
 
-## Arrancar sem Docker (desenvolvimento)
+## Start without Docker (development)
 
-Pré-requisito: Node.js 18+ (usa `fetch` nativo — sem dependências extra para verificação de links ou previews).
+Prerequisite: Node.js 18+ (uses native `fetch` — no extra dependencies for link checking or previews).
 
 ```bash
 npm install
 npm start
 ```
 
-Aplicação disponível em http://localhost:3000.
+App available at http://localhost:3000.
 
-## Funcionalidades
+## Features
 
-### Gestão básica
-- **Adicionar** nó (título, URL, notas, etiquetas, favorito)
-- **Editar** qualquer campo de um nó existente
-- **Apagar** com confirmação
-- **Pesquisar** por título, URL, notas ou etiqueta
-- **Filtrar** por etiqueta (seleção múltipla, modo "qualquer uma" ou "todas") ou por favoritos
-- **Ordenar** por mais recente, mais antigo, título A-Z/Z-A, favoritos primeiro, ou **ordem manual**
-- **Copiar URL** com um clique
-- Validação de URL (normaliza automaticamente para `https://` se não indicares protocolo)
+### Basic management
+- **Add** a node (title, URL, notes, tags, favorite)
+- **Edit** any field of an existing node
+- **Delete** with confirmation
+- **Search** by title, URL, notes, or tag
+- **Filter** by tag (multi-select, "any" or "all" mode) or by favorites
+- **Sort** by most recent, oldest, title A-Z/Z-A, favorites first, or **manual order**
+- **Copy URL** with one click
+- URL validation (automatically normalizes to `https://` if no protocol is given)
 
-### Organização
-- **Arrastar para reordenar** — escolhe "Ordem manual" no menu de ordenar e arrasta os nós pela pega (⠿) para a posição desejada
-- **Deteção de duplicados** — ao adicionar um link já existente (mesmo com `www.` ou barra final diferentes), a app avisa antes de guardar; o botão **Duplicados** mostra todos os grupos já existentes na coleção, com opção de remover
-- Alternar entre **vista em lista ou grelha**, e entre **densidade confortável ou compacta** (preferências guardadas no browser)
-- **Tema claro/escuro** alternável (preferência guardada no browser)
+### Organization
+- **Drag to reorder** — choose "Manual order" in the sort menu and drag nodes by their handle (⠿) to the desired position
+- **Duplicate detection** — when adding a link that already exists (even with a different `www.` or trailing slash), the app warns before saving; the **Duplicates** button shows all existing groups in the collection, with an option to remove
+- Toggle between **list or grid view**, and between **comfortable or compact density** (preferences saved in the browser)
+- Toggleable **light/dark theme** (preference saved in the browser)
 
-### Importação e exportação
-- **Importar bookmarks** exportados do Chrome/Firefox/Edge (ficheiro `.html`) — etiquetas do Firefox são preservadas automaticamente
-- **Importar `links.json`** de outra instância desta app (ou o teu próprio backup)
-- Ambos os métodos de importação ignoram automaticamente links que já existem na coleção
-- **Exportar** a coleção completa como ficheiro `.json` a qualquer momento
+### Import and export
+- **Import bookmarks** exported from Chrome/Firefox/Edge (`.html` file) — Firefox tags are automatically preserved
+- **Import a `links.json`** file from another instance of this app (or your own backup)
+- Both import methods automatically skip links that already exist in the collection
+- **Export** the full collection as a `.json` file at any time
 
-### Saúde dos links
-- **Verificação automática de links mortos** — corre em segundo plano ao arrancar o servidor e depois periodicamente (24h por padrão, configurável)
-- **Botão "Verificar links"** para forçar uma verificação imediata de toda a coleção, com indicador de progresso
-- Cada nó mostra um selo de estado: **ok** (acessível), **quebrado** (não respondeu) ou **por verificar** — clicável para verificar individualmente
+### Link health
+- **Automatic dead link checking** — runs in the background at server startup and then periodically (every 24h by default, configurable)
+- **"Check links" button** to force an immediate check of the whole collection, with a progress indicator
+- Each node shows a health badge: **ok** (reachable), **broken** (didn't respond), or **unchecked** — clickable to check individually
 
-### Preview e estatísticas
-- **Preview ao passar o rato** sobre o título de um nó — mostra imagem, título e descrição Open Graph do site (com cache de 1h no servidor)
-- **Estatísticas da coleção**: total de nós, favoritos, etiquetas, saúde dos links, etiquetas mais usadas e domínios mais guardados
+### Preview and statistics
+- **Preview on hover** over a node's title — shows the Open Graph image, title, and description of the site (cached for 1h on the server)
+- **Collection statistics**: total nodes, favorites, tags, link health, most used tags, and most saved domains
 
-### Robustez
-- **Backup automático diário** dos dados, com rotação (mantém as últimas 14 cópias por padrão) — guardado em `data/backups/`
-- **Paginação transparente**: a lista carrega os primeiros 40 nós e vai buscar mais automaticamente ao aproximares-te do fim da página, sem numeração de páginas visível
-- Atalho de teclado `/` para focar a pesquisa
+### Robustness
+- **Automatic daily backup** of the data, with rotation (keeps the last 14 copies by default) — stored in `data/backups/`
+- **Transparent pagination**: the list loads the first 40 nodes and automatically fetches more as you approach the end of the page, with no visible page numbers
+- Keyboard shortcut `/` to focus the search box
 
-## Configuração
+## Configuration
 
-Variáveis de ambiente (já definidas no `docker-compose.yml`, algumas comentadas por serem opcionais):
+Environment variables (already set in `docker-compose.yml`, some commented out since they're optional):
 
-| Variável                     | Default | Descrição                                          |
-|-------------------------------|---------|-----------------------------------------------------|
-| `PORT`                        | 3000    | Porta onde o servidor escuta                        |
-| `DATA_DIR`                    | ./data  | Pasta onde `links.json` e `backups/` são guardados  |
-| `BACKUP_RETENTION`             | 14      | Número de backups diários a manter antes de rodar   |
-| `LINK_CHECK_INTERVAL_HOURS`    | 24      | Frequência da verificação automática de links mortos |
+| Variable                     | Default | Description                                          |
+|-------------------------------|---------|--------------------------------------------------------|
+| `PORT`                        | 3000    | Port the server listens on                             |
+| `DATA_DIR`                    | ./data  | Folder where `links.json` and `backups/` are stored    |
+| `BACKUP_RETENTION`             | 14      | Number of daily backups to keep before rotating        |
+| `LINK_CHECK_INTERVAL_HOURS`    | 24      | How often automatic dead link checking runs            |
 
-Para mudar a porta externa, edita `docker-compose.yml`:
+To change the external port, edit `docker-compose.yml`:
 
 ```yaml
 ports:
-  - "8080:3000"   # acede em localhost:8080
+  - "8080:3000"   # access at localhost:8080
 ```
 
-## Estrutura do projeto
+## Project structure
 
 ```
 link-manager/
-├── server.js           # Backend Express + API REST
+├── server.js           # Express backend + REST API
 ├── package.json
 ├── Dockerfile
 ├── docker-compose.yml
 ├── .dockerignore
 ├── data/
-│   ├── links.json      # Persistência principal
-│   └── backups/        # Backups automáticos rotativos
-└── public/              # Frontend estático
+│   ├── links.json      # Main persistence file
+│   └── backups/        # Rotating automatic backups
+└── public/              # Static frontend
     ├── index.html
     ├── style.css
     └── app.js
 ```
 
-## API REST
+## REST API
 
-| Método | Rota                              | Descrição                                             |
-|--------|-------------------------------------|--------------------------------------------------------|
-| GET    | `/api/links`                       | Lista links (`?q=`, `?tag=`, `?favorite=true`)         |
-| GET    | `/api/links/:id`                   | Obtém um link                                          |
-| POST   | `/api/links`                       | Cria link                                              |
-| PUT    | `/api/links/:id`                   | Edita link                                             |
-| DELETE | `/api/links/:id`                   | Apaga link                                             |
-| PUT    | `/api/links/reorder`               | Reordena links (recebe `orderedIds: [...]`)            |
-| GET    | `/api/links/check-duplicate`       | Verifica se uma URL já existe (`?url=`)                |
-| GET    | `/api/duplicates`                  | Lista todos os grupos de duplicados na coleção         |
-| POST   | `/api/links/:id/check`             | Verifica se um link individual está acessível          |
-| POST   | `/api/links/check-all`             | Verifica todos os links (corre em lotes)               |
-| GET    | `/api/links/check-status`          | Indica se há uma verificação em curso                  |
-| GET    | `/api/preview?url=`                | Devolve dados Open Graph (título, descrição, imagem)   |
-| POST   | `/api/import/bookmarks`            | Importa bookmarks HTML (`{html, defaultTags}`)         |
-| POST   | `/api/import/json`                 | Importa links de um JSON (`{items, defaultTags}`)      |
-| GET    | `/api/backups`                     | Lista backups disponíveis                              |
-| POST   | `/api/backups`                     | Cria um backup imediato                                |
-| POST   | `/api/backups/:file/restore`       | Restaura um backup específico                          |
-| GET    | `/api/stats`                       | Estatísticas da coleção                                |
-| GET    | `/api/tags`                        | Lista todas as tags usadas                             |
-| GET    | `/api/health`                      | Health check                                           |
+| Method | Route                              | Description                                             |
+|--------|-------------------------------------|-----------------------------------------------------------|
+| GET    | `/api/links`                       | List links (`?q=`, `?tag=`, `?favorite=true`)              |
+| GET    | `/api/links/:id`                   | Get a single link                                          |
+| POST   | `/api/links`                       | Create a link                                               |
+| PUT    | `/api/links/:id`                   | Edit a link                                                 |
+| DELETE | `/api/links/:id`                   | Delete a link                                               |
+| PUT    | `/api/links/reorder`               | Reorder links (receives `orderedIds: [...]`)                |
+| GET    | `/api/links/check-duplicate`       | Check whether a URL already exists (`?url=`)                |
+| GET    | `/api/duplicates`                  | List all duplicate groups in the collection                 |
+| POST   | `/api/links/:id/check`             | Check whether a single link is reachable                    |
+| POST   | `/api/links/check-all`             | Check all links (runs in batches)                            |
+| GET    | `/api/links/check-status`          | Whether a check is currently in progress                    |
+| GET    | `/api/preview?url=`                | Returns Open Graph data (title, description, image)         |
+| POST   | `/api/import/bookmarks`            | Import HTML bookmarks (`{html, defaultTags}`)                |
+| POST   | `/api/import/json`                 | Import links from JSON (`{items, defaultTags}`)              |
+| GET    | `/api/backups`                     | List available backups                                       |
+| POST   | `/api/backups`                     | Create an immediate backup                                   |
+| POST   | `/api/backups/:file/restore`       | Restore a specific backup                                     |
+| GET    | `/api/stats`                       | Collection statistics                                        |
+| GET    | `/api/tags`                        | List all tags in use                                          |
+| GET    | `/api/health`                      | Health check                                                  |
 
-## Backup dos dados
+## Data backup
 
-Além do backup automático diário em `data/backups/`, os teus links ficam sempre em `data/links.json` — um ficheiro JSON simples, fácil de copiar ou versionar manualmente. Podes também usar o botão **Exportar .json** na interface a qualquer momento.
+Besides the automatic daily backup in `data/backups/`, your links always live in `data/links.json` — a plain JSON file, easy to copy or version manually. You can also use the **Export .json** button in the UI at any time.
