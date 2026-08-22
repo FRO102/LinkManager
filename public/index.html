@@ -25,6 +25,10 @@
       <span class="status-label">Ligado ao servidor</span>
     </span>
     <div class="file-buttons">
+      <button class="btn btn-ghost" id="btnStats" title="Ver estatísticas da coleção">Estatísticas</button>
+      <button class="btn btn-ghost" id="btnDuplicates" title="Ver nós duplicados">Duplicados</button>
+      <button class="btn btn-ghost" id="btnCheckLinks" title="Verificar todos os links agora">Verificar links</button>
+      <button class="btn btn-ghost" id="btnImport" title="Importar bookmarks ou links.json">Importar</button>
       <button class="btn btn-ghost" id="btnToggleTheme" title="Alternar tema">🌗</button>
       <button class="btn btn-ghost" id="btnExport" title="Descarregar cópia como links.json">Exportar .json</button>
     </div>
@@ -50,7 +54,7 @@
       </div>
 
       <div class="field">
-        <label for="inputTags">Etiquetas</label>
+        <label for="inputTags">Tags</label>
         <input type="text" id="inputTags" name="tags" placeholder="trabalho, leitura, ferramenta (separadas por vírgula)">
       </div>
 
@@ -90,10 +94,17 @@
             <option value="az">Título A–Z</option>
             <option value="za">Título Z–A</option>
             <option value="favorites">Favoritos primeiro</option>
+            <option value="manual">Ordem manual (arrastar)</option>
           </select>
         </div>
 
         <button class="btn btn-ghost" id="btnToggleView" title="Alternar entre lista e grelha">⊞</button>
+        <button class="btn btn-ghost" id="btnToggleDensity" title="Alternar densidade (compacta/confortável)">≣</button>
+      </div>
+
+      <div class="check-progress hidden" id="checkProgress">
+        <span class="spinner" aria-hidden="true"></span>
+        <span id="checkProgressText">A verificar links…</span>
       </div>
     </div>
 
@@ -124,6 +135,82 @@
       <button class="btn btn-danger" id="confirmDelete">Remover</button>
     </div>
   </div>
+</div>
+
+<!-- Modal de importação -->
+<div id="importOverlay" class="confirm-overlay hidden">
+  <div class="confirm-box modal-box" role="dialog" aria-modal="true" aria-labelledby="importTitle">
+    <div class="modal-box-header">
+      <h3 id="importTitle">Importar nós</h3>
+      <button class="btn-icon-close" id="importClose" aria-label="Fechar">✕</button>
+    </div>
+
+    <div class="import-tabs" role="tablist">
+      <button class="import-tab active" id="tabBookmarks" data-tab="bookmarks" role="tab" aria-selected="true">Bookmarks (.html)</button>
+      <button class="import-tab" id="tabJson" data-tab="json" role="tab" aria-selected="false">Ficheiro .json</button>
+    </div>
+
+    <div class="import-panel" id="panelBookmarks">
+      <p class="import-hint">Exporta os favoritos do Chrome, Firefox ou Edge como HTML e carrega aqui.</p>
+      <input type="file" id="fileBookmarks" accept=".html,.htm">
+      <div class="field">
+        <label for="importTagsBookmarks">Etiqueta a aplicar a todos (opcional)</label>
+        <input type="text" id="importTagsBookmarks" placeholder="ex: importado-chrome">
+      </div>
+    </div>
+
+    <div class="import-panel hidden" id="panelJson">
+      <p class="import-hint">Carrega um ficheiro <code>links.json</code> exportado desta app (ou de outra instância).</p>
+      <input type="file" id="fileJson" accept=".json">
+      <div class="field">
+        <label for="importTagsJson">Etiqueta a aplicar a todos (opcional)</label>
+        <input type="text" id="importTagsJson" placeholder="ex: importado-backup">
+      </div>
+    </div>
+
+    <p class="form-error hidden" id="importError"></p>
+    <p class="import-result hidden" id="importResult"></p>
+
+    <div class="confirm-actions">
+      <button class="btn btn-ghost" id="importCancel">Cancelar</button>
+      <button class="btn btn-primary" id="importSubmit">Importar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal de estatísticas -->
+<div id="statsOverlay" class="confirm-overlay hidden">
+  <div class="confirm-box modal-box stats-box" role="dialog" aria-modal="true" aria-labelledby="statsTitle">
+    <div class="modal-box-header">
+      <h3 id="statsTitle">Estatísticas da coleção</h3>
+      <button class="btn-icon-close" id="statsClose" aria-label="Fechar">✕</button>
+    </div>
+    <div id="statsContent" class="stats-content">
+      <p class="import-hint">A carregar…</p>
+    </div>
+  </div>
+</div>
+
+<!-- Modal de duplicados -->
+<div id="duplicatesOverlay" class="confirm-overlay hidden">
+  <div class="confirm-box modal-box" role="dialog" aria-modal="true" aria-labelledby="duplicatesTitle">
+    <div class="modal-box-header">
+      <h3 id="duplicatesTitle">Nós duplicados</h3>
+      <button class="btn-icon-close" id="duplicatesClose" aria-label="Fechar">✕</button>
+    </div>
+    <div id="duplicatesContent" class="duplicates-content"></div>
+  </div>
+</div>
+
+<!-- Preview flutuante (Open Graph) -->
+<div id="linkPreview" class="link-preview-popover hidden">
+  <div class="preview-loading" id="previewLoading">A carregar preview…</div>
+  <div class="preview-body hidden" id="previewBody">
+    <img id="previewImage" class="preview-image hidden" alt="">
+    <p id="previewTitle" class="preview-title"></p>
+    <p id="previewDescription" class="preview-description"></p>
+  </div>
+  <div class="preview-empty hidden" id="previewEmpty">Sem preview disponível para este endereço.</div>
 </div>
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>

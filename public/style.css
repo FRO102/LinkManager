@@ -478,14 +478,14 @@ button, input, textarea, select{
 .link-card{
   position: relative;
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto auto 1fr auto;
   gap: 14px;
   align-items: start;
   background: var(--paper-raised);
   border: 1px solid var(--line);
   border-radius: var(--radius);
   padding: 16px 18px;
-  transition: border-color 0.12s ease, transform 0.12s ease;
+  transition: border-color 0.12s ease, transform 0.12s ease, opacity 0.12s ease, box-shadow 0.12s ease;
   animation: card-in 0.22s ease backwards;
 }
 
@@ -740,6 +740,394 @@ button, input, textarea, select{
 }
 .toast.error{ background: var(--danger); }
 .toast.success{ background: var(--good); }
+
+/* ---------- Progresso de verificação de links ---------- */
+
+.check-progress{
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-soft);
+  margin-left: auto;
+}
+
+.spinner{
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid var(--line);
+  border-top-color: var(--indigo);
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin{
+  to{ transform: rotate(360deg); }
+}
+
+/* ---------- Estado de saúde do link (ok / broken / unchecked) ---------- */
+
+.link-health-badge{
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+
+.link-health-badge[data-status="ok"]{
+  color: var(--good);
+  border-color: var(--good);
+}
+.link-health-badge[data-status="broken"]{
+  color: var(--danger);
+  border-color: var(--danger);
+}
+.link-health-badge .health-dot{
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* ---------- Drag & drop reordenar ---------- */
+
+.link-card.is-dragging{
+  opacity: 0.4;
+}
+
+.link-card.drag-over-top{
+  box-shadow: inset 0 3px 0 var(--indigo);
+}
+.link-card.drag-over-bottom{
+  box-shadow: inset 0 -3px 0 var(--indigo);
+}
+
+.drag-handle{
+  cursor: grab;
+  color: var(--ink-soft);
+  opacity: 0.4;
+  font-size: 13px;
+  padding: 4px 2px;
+  align-self: center;
+  transition: opacity 0.12s ease;
+  touch-action: none;
+}
+.link-card:hover .drag-handle{ opacity: 0.9; }
+.drag-handle:active{ cursor: grabbing; }
+
+/* Só faz sentido reordenar manualmente quando a ordenação é "manual" */
+.link-list:not(.sort-manual) .drag-handle{
+  visibility: hidden;
+}
+
+/* ---------- Densidade compacta ---------- */
+
+.link-list.density-compact .link-card{
+  padding: 8px 14px;
+  gap: 10px;
+}
+.link-list.density-compact .link-favicon{
+  width: 22px;
+  height: 22px;
+}
+.link-list.density-compact .link-title{
+  font-size: 14px;
+}
+.link-list.density-compact .link-url,
+.link-list.density-compact .link-notes,
+.link-list.density-compact .link-tags,
+.link-list.density-compact .link-meta{
+  display: none;
+}
+.link-list.density-compact .link-actions{
+  flex-direction: row;
+}
+
+/* ---------- Modal genérico (import / stats / duplicados) ---------- */
+
+.modal-box{
+  max-width: 480px;
+  text-align: left;
+}
+
+.modal-box-header{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.modal-box-header h3{
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.btn-icon-close{
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--ink-soft);
+  font-size: 15px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: var(--radius);
+}
+.btn-icon-close:hover{ background: var(--paper); color: var(--ink); }
+
+/* ---------- Import ---------- */
+
+.import-tabs{
+  display: flex;
+  gap: 4px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.import-tab{
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--ink-soft);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 8px 4px;
+  margin-bottom: -1px;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+}
+.import-tab.active{
+  color: var(--indigo);
+  border-bottom-color: var(--indigo);
+}
+
+.import-panel .field{ margin-top: 12px; }
+
+.import-hint{
+  font-size: 13px;
+  color: var(--ink-soft);
+  line-height: 1.5;
+  margin: 0 0 10px;
+}
+.import-hint code{
+  background: var(--paper);
+  border: 1px solid var(--line);
+  padding: 1px 5px;
+  border-radius: var(--radius);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.import-result{
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--good);
+  background: rgba(62,107,79,0.1);
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  margin: 12px 0 0;
+}
+
+input[type="file"]{
+  width: 100%;
+  font-size: 12.5px;
+  color: var(--ink-soft);
+}
+
+/* ---------- Estatísticas ---------- */
+
+.stats-box{ max-width: 560px; }
+
+.stats-content{
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.stats-grid{
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: 10px;
+}
+
+.stat-tile{
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 12px;
+  text-align: center;
+}
+.stat-tile .stat-value{
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--indigo);
+  line-height: 1.1;
+}
+.stat-tile .stat-label{
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-soft);
+  margin-top: 4px;
+}
+.stat-tile.stat-broken .stat-value{ color: var(--danger); }
+
+.stats-section h4{
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-soft);
+  margin: 0 0 10px;
+}
+
+.stat-bar-row{
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 12.5px;
+}
+.stat-bar-label{
+  width: 110px;
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.stat-bar-track{
+  flex: 1;
+  height: 8px;
+  background: var(--paper);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.stat-bar-fill{
+  height: 100%;
+  background: var(--indigo);
+  border-radius: 999px;
+}
+.stat-bar-count{
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-soft);
+  width: 24px;
+  text-align: right;
+}
+
+/* ---------- Duplicados ---------- */
+
+.duplicates-content{
+  max-height: 60vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.duplicate-group{
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 12px;
+  background: var(--paper);
+}
+.duplicate-group-url{
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-soft);
+  margin: 0 0 8px;
+  word-break: break-all;
+}
+.duplicate-item{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 0;
+  border-top: 1px solid var(--line);
+}
+.duplicate-item:first-of-type{ border-top: none; }
+.duplicate-item-title{
+  font-size: 13px;
+  color: var(--ink);
+}
+.duplicate-item-date{
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink-soft);
+}
+
+/* ---------- Preview popover (Open Graph) ---------- */
+
+.link-preview-popover{
+  position: fixed;
+  z-index: 60;
+  width: 280px;
+  background: var(--paper-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: 0 16px 40px -10px rgba(0,0,0,0.3);
+  padding: 12px;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.12s ease, transform 0.12s ease;
+}
+.link-preview-popover.visible{
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.preview-loading,
+.preview-empty{
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--ink-soft);
+  text-align: center;
+  padding: 20px 0;
+}
+
+.preview-image{
+  width: 100%;
+  height: 130px;
+  object-fit: cover;
+  border-radius: var(--radius);
+  margin-bottom: 8px;
+  background: var(--paper);
+}
+
+.preview-title{
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 14px;
+  margin: 0 0 4px;
+  line-height: 1.3;
+}
+
+.preview-description{
+  font-size: 12px;
+  color: var(--ink-soft);
+  line-height: 1.5;
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
 
 /* ---------- Focus visibility (a11y) ---------- */
 
