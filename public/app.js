@@ -25,6 +25,7 @@
   const PAGE_SIZE = 40;
   let visibleCount = PAGE_SIZE;
   let renderedIds = []; // IDs currently in the DOM, in order — used by drag & drop
+  const recentlyAddedIds = new Set(); // briefly highlights newly created nodes
 
   try { viewMode = localStorage.getItem('nodes-view-mode') || 'list'; } catch {}
   try { density = localStorage.getItem('nodes-density') || 'comfortable'; } catch {}
@@ -56,6 +57,8 @@
   const toastEl         = $('#toast');
   const btnToggleView   = $('#btnToggleView');
   const btnToggleDensity = $('#btnToggleDensity');
+  const viewToggleLabel = $('#viewToggleLabel');
+  const densityToggleLabel = $('#densityToggleLabel');
   const btnExport       = $('#btnExport');
   const btnImport       = $('#btnImport');
   const btnStats        = $('#btnStats');
@@ -179,6 +182,52 @@
     if (hours < 24) return `${hours}h ago`;
     const days = Math.round(hours / 24);
     return `${days}d ago`;
+  }
+
+  // ---------- Focus trap (accessibility) ----------
+  // Keeps Tab/Shift+Tab cycling inside the active modal instead of leaking
+  // focus out to the page behind it. One trap is active at a time.
+
+  let activeFocusTrap = null;
+
+  function getFocusableEls(container) {
+    const selector = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+    return Array.from(container.querySelectorAll(selector)).filter(el => el.offsetParent !== null);
+  }
+
+  function trapFocus(container, restoreEl) {
+    activeFocusTrap = { container, restoreEl: restoreEl || document.activeElement };
+    const focusable = getFocusableEls(container);
+    if (focusable.length > 0) focusable[0].focus();
+  }
+
+  function releaseFocusTrap() {
+    if (activeFocusTrap && activeFocusTrap.restoreEl && document.body.contains(activeFocusTrap.restoreEl)) {
+      activeFocusTrap.restoreEl.focus();
+    }
+    activeFocusTrap = null;
+  }
+
+  function setupGlobalFocusTrapHandler() {
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Tab' || !activeFocusTrap) return;
+      const focusable = getFocusableEls(activeFocusTrap.container);
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      } else if (!activeFocusTrap.container.contains(document.activeElement)) {
+        // Focus somehow escaped the trap (e.g. programmatic focus elsewhere) — pull it back in.
+        e.preventDefault();
+        first.focus();
+      }
+    });
   }
 
   // ---------- API ----------
@@ -376,9 +425,10 @@
         showToast('Node updated', 'success');
         exitEditMode();
       } else {
-        await apiCreate(payload);
+        const created = await apiCreate(payload);
         showToast('Node added', 'success');
         form.reset();
+        markRecentlyAdded(created.id);
       }
       await refresh();
       if (isComposerCollapsible()) closeComposerPanel();
@@ -394,11 +444,13 @@
     pendingDeleteId = link.id;
     confirmText.textContent = `Are you sure you want to remove "${link.title}"? This action cannot be undone.`;
     confirmOverlay.classList.remove('hidden');
+    trapFocus(document.querySelector('#confirmOverlay .confirm-box'));
   }
 
   function closeConfirm() {
     pendingDeleteId = null;
     confirmOverlay.classList.add('hidden');
+    releaseFocusTrap();
   }
 
   async function confirmDeleteNow() {
@@ -710,6 +762,9 @@
     const isBlocked = link.linkStatus === 'broken' && BLOCKED_STATUS_CODES.has(link.linkStatusCode);
     const badgeStatus = isBlocked ? 'blocked' : link.linkStatus;
     const label = link.linkStatus === 'ok' ? 'ok' : (isBlocked ? 'blocked' : 'broken');
+    // Problem states get a shape marker (▲) in addition to color, so the signal
+    // doesn't rely on color alone — helps with color vision differences and low contrast.
+    const marker = link.linkStatus === 'ok' ? '<span class="health-dot"></span>' : '<span class="health-mark">▲</span>';
 
     let tooltip;
     if (link.linkStatus === 'ok') {
@@ -725,34 +780,49 @@
     }
 
     return `<button type="button" class="link-health-badge" data-status="${badgeStatus}" data-action="check-one" data-id="${link.id}" title="${tooltip}${link.linkStatusCode ? ' (HTTP ' + link.linkStatusCode + ')' : ''} · checked ${timeAgo(link.lastCheckedAt) || ''} · click to check again">
-          <span class="health-dot"></span>${label}
+          ${marker}${label}
         </button>`;
   }
 
   function buildCardEl(link) {
     const li = document.createElement('li');
-    li.className = 'link-card' + (link.favorite ? ' is-favorite' : '');
+    const isProblem = link.linkStatus === 'broken';
+    li.className = 'link-card'
+      + (link.favorite ? ' is-favorite' : '')
+      + (isProblem ? ' has-problem' : '')
+      + (recentlyAddedIds.has(link.id) ? ' is-recent' : '');
     li.dataset.id = link.id;
     li.draggable = sortMode === 'manual';
 
     const favicon = faviconFor(link.url);
     const tags = link.tags || [];
+    const isManual = sortMode === 'manual';
 
     const healthBadge = buildHealthBadge(link);
 
+    const dragHandle = isManual
+      ? `<span class="drag-handle-group">
+          <button type="button" class="drag-handle" data-action="move-up" data-id="${link.id}" title="Move up" aria-label="Move ${escapeHtml(link.title)} up">▲</button>
+          <span class="drag-handle-icon" aria-hidden="true">⠿</span>
+          <button type="button" class="drag-handle" data-action="move-down" data-id="${link.id}" title="Move down" aria-label="Move ${escapeHtml(link.title)} down">▼</button>
+        </span>`
+      : `<span class="drag-handle-icon drag-handle-idle" aria-hidden="true">⠿</span>`;
+
     li.innerHTML = `
-      <span class="drag-handle" title="Drag to reorder">⠿</span>
+      ${dragHandle}
       <div class="link-favicon">${favicon ? `<img src="${favicon}" alt="" loading="lazy" onerror="this.parentElement.textContent='◈'">` : '◈'}</div>
       <div class="link-body">
         <div class="link-title-row">
           <a class="link-title" href="${escapeHtml(link.url)}" target="_blank" rel="noopener noreferrer" data-action="preview-target">${escapeHtml(link.title)}</a>
-          ${link.favorite ? '<span class="favorite-star">★</span>' : ''}
-          ${healthBadge}
+          ${link.favorite ? '<span class="favorite-star" title="Favorite">★</span>' : ''}
         </div>
         <a class="link-url" href="${escapeHtml(link.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(hostnameFor(link.url))}</a>
         ${link.description ? `<p class="link-notes">${escapeHtml(link.description)}</p>` : ''}
         ${tags.length ? `<div class="link-tags">${tags.map(t => `<button type="button" class="link-tag" data-action="filter-tag" data-tag="${escapeHtml(t)}">${escapeHtml(t)}</button>`).join('')}</div>` : ''}
-        <p class="link-meta">added on ${formatDate(link.createdAt)}</p>
+        <div class="link-footer-row">
+          <p class="link-meta">added ${formatDate(link.createdAt)}</p>
+          ${healthBadge}
+        </div>
       </div>
       <div class="link-actions">
         <button class="icon-btn fav-btn${link.favorite ? ' active' : ''}" title="Toggle favorite" data-action="favorite" data-id="${link.id}">★</button>
@@ -772,6 +842,15 @@
   function resetPaginationAndRender() {
     visibleCount = PAGE_SIZE;
     renderList();
+  }
+
+  function markRecentlyAdded(id) {
+    recentlyAddedIds.add(id);
+    setTimeout(() => {
+      recentlyAddedIds.delete(id);
+      const el = linkListEl.querySelector(`.link-card[data-id="${id}"]`);
+      if (el) el.classList.remove('is-recent');
+    }, 2600);
   }
 
   // ---------- Event wiring ----------
@@ -797,6 +876,9 @@
       resetPaginationAndRender();
     }
     if (action === 'check-one' && link) checkOneLink(link, btn);
+    if ((action === 'move-up' || action === 'move-down') && link) {
+      moveNodeManually(id, action === 'move-up' ? -1 : 1, btn);
+    }
   });
 
   confirmCancel.addEventListener('click', closeConfirm);
@@ -825,7 +907,13 @@
   btnToggleView.addEventListener('click', toggleView);
 
   window.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') closeConfirm();
+    if (e.key === 'Escape') {
+      if (!confirmOverlay.classList.contains('hidden')) closeConfirm();
+      else if (!importOverlay.classList.contains('hidden')) closeImportModal();
+      else if (!statsOverlay.classList.contains('hidden')) closeStatsModal();
+      else if (!duplicatesOverlay.classList.contains('hidden')) closeDuplicatesModal();
+      else if (isComposerCollapsible() && composerPanel.classList.contains('is-open')) closeComposerPanel();
+    }
     if (e.key === '/' &&
         document.activeElement !== inputUrl &&
         document.activeElement !== inputTitle &&
@@ -848,14 +936,31 @@
   function toggleView() {
     viewMode = viewMode === 'list' ? 'grid' : 'list';
     try { localStorage.setItem('nodes-view-mode', viewMode); } catch {}
-    btnToggleView.textContent = viewMode === 'list' ? '⊞' : '≡';
+    syncViewToggleUI();
     renderList();
+  }
+
+  function syncViewToggleUI() {
+    const isGrid = viewMode === 'grid';
+    viewToggleLabel.textContent = isGrid ? 'Grid' : 'List';
+    btnToggleView.title = isGrid ? 'Switch to list view' : 'Switch to grid view';
+    btnToggleView.setAttribute('aria-pressed', String(isGrid));
+    btnToggleView.classList.toggle('is-active-toggle', isGrid);
   }
 
   function toggleDensity() {
     density = density === 'comfortable' ? 'compact' : 'comfortable';
     try { localStorage.setItem('nodes-density', density); } catch {}
+    syncDensityToggleUI();
     renderList();
+  }
+
+  function syncDensityToggleUI() {
+    const isCompact = density === 'compact';
+    densityToggleLabel.textContent = isCompact ? 'Compact' : 'Comfortable';
+    btnToggleDensity.title = isCompact ? 'Switch to comfortable density' : 'Switch to compact density';
+    btnToggleDensity.setAttribute('aria-pressed', String(isCompact));
+    btnToggleDensity.classList.toggle('is-active-toggle', isCompact);
   }
 
   // ---------- Dead link checking ----------
@@ -933,6 +1038,42 @@
     }, 4000);
   }
 
+  // ---------- Keyboard-accessible manual reordering ----------
+
+  async function moveNodeManually(id, direction, btnEl) {
+    // Work against the currently visible, filtered/sorted order so "up/down"
+    // matches what the user actually sees on screen.
+    const visibleList = getFilteredSorted();
+    const idx = visibleList.findIndex(l => l.id === id);
+    const targetIdx = idx + direction;
+    if (idx === -1 || targetIdx < 0 || targetIdx >= visibleList.length) return;
+
+    const a = visibleList[idx];
+    const b = visibleList[targetIdx];
+
+    // Swap their `order` values and push the new order for every visible node,
+    // so the rest of the manual sequence stays consistent.
+    const swappedOrder = [...visibleList];
+    swappedOrder[idx] = b;
+    swappedOrder[targetIdx] = a;
+    const orderedIds = swappedOrder.map(l => l.id);
+
+    try {
+      await apiReorder(orderedIds);
+      orderedIds.forEach((linkId, i) => {
+        const link = links.find(l => l.id === linkId);
+        if (link) link.order = i;
+      });
+      renderList();
+      // Restore focus to the same node's move button so keyboard users don't lose their place.
+      const movedBtn = linkListEl.querySelector(`.link-card[data-id="${id}"] [data-action="${direction === -1 ? 'move-up' : 'move-down'}"]`);
+      if (movedBtn) movedBtn.focus();
+      showToast(`Moved ${direction === -1 ? 'up' : 'down'}`);
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  }
+
   // ---------- Drag & drop (manual reordering) ----------
 
   let dragSourceId = null;
@@ -941,6 +1082,9 @@
     linkListEl.addEventListener('dragstart', (e) => {
       const card = e.target.closest('.link-card');
       if (!card || sortMode !== 'manual') { e.preventDefault(); return; }
+      // Don't start a drag when the user is actually clicking the up/down
+      // keyboard-accessible move buttons — those have their own click handler.
+      if (e.target.closest('.drag-handle')) { e.preventDefault(); return; }
       dragSourceId = card.dataset.id;
       card.classList.add('is-dragging');
       e.dataTransfer.effectAllowed = 'move';
@@ -1101,10 +1245,12 @@
     fileJson.value = '';
     importTagsBookmarks.value = '';
     importTagsJson.value = '';
+    trapFocus(document.querySelector('#importOverlay .confirm-box'));
   }
 
   function closeImportModal() {
     importOverlay.classList.add('hidden');
+    releaseFocusTrap();
   }
 
   function switchImportTab(tab) {
@@ -1175,6 +1321,7 @@
   async function openStatsModal() {
     statsOverlay.classList.remove('hidden');
     statsContent.innerHTML = '<p class="import-hint">Loading…</p>';
+    trapFocus(document.querySelector('#statsOverlay .confirm-box'));
     try {
       const stats = await apiStats();
       statsContent.innerHTML = renderStatsHtml(stats);
@@ -1185,6 +1332,7 @@
 
   function closeStatsModal() {
     statsOverlay.classList.add('hidden');
+    releaseFocusTrap();
   }
 
   function renderStatsHtml(stats) {
@@ -1219,6 +1367,7 @@
   async function openDuplicatesModal() {
     duplicatesOverlay.classList.remove('hidden');
     duplicatesContent.innerHTML = '<p class="import-hint">Looking for duplicates…</p>';
+    trapFocus(document.querySelector('#duplicatesOverlay .confirm-box'));
     try {
       const groups = await apiDuplicates();
       if (groups.length === 0) {
@@ -1244,6 +1393,7 @@
 
   function closeDuplicatesModal() {
     duplicatesOverlay.classList.add('hidden');
+    releaseFocusTrap();
   }
 
   duplicatesContent.addEventListener('click', async (e) => {
@@ -1389,7 +1539,8 @@
     try { savedTheme = localStorage.getItem('nodes-theme'); } catch {}
     if (savedTheme === 'dark' || savedTheme === null) document.body.dataset.theme = 'dark';
 
-    btnToggleView.textContent = viewMode === 'list' ? '⊞' : '≡';
+    syncViewToggleUI();
+    syncDensityToggleUI();
 
     attachDragHandlers();
     setupPreviewHover();
@@ -1429,6 +1580,7 @@
     setupTagPopover();
     setupClearFilters();
     setupComposerPanel();
+    setupGlobalFocusTrapHandler();
 
     await refresh();
 

@@ -13,7 +13,7 @@
   --line:         #C9C3B3;
   --indigo:       #2F3E63;
   --indigo-soft:  #5A6B96;
-  --copper:       #B5642E;
+  --copper:       #9C4E20;
   --copper-soft:  #E4B48C;
   --good:         #3E6B4F;
   --danger:       #A8402C;
@@ -34,7 +34,7 @@ body[data-theme="dark"] {
   --line:         #444;
   --indigo:       #8a99c4;
   --indigo-soft:  #5a6b96;
-  --copper:       #d68650;
+  --copper:       #f0a423;
   --copper-soft:  #b5642e;
   --good:         #5c9e74;
   --danger:       #d9705a;
@@ -492,14 +492,33 @@ button, input, textarea, select{
 
 .toolbar{
   display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  align-items: center;
+  flex-direction: column;
+  gap: 10px;
   margin-bottom: 14px;
+}
+
+.toolbar-row{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.toolbar-row-filters{
+  justify-content: space-between;
+}
+
+.toolbar-row-controls{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-left: auto;
 }
 
 .search-input{
   flex: 1 1 220px;
+  width: 100%;
   background: var(--paper-raised);
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -515,6 +534,32 @@ button, input, textarea, select{
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  align-items: center;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.view-density-group{
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.toggle-btn{
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.toggle-btn.is-active-toggle{
+  background: var(--indigo);
+  border-color: var(--indigo);
+  color: #F7F5EF;
+}
+.toggle-btn.is-active-toggle:hover{
+  background: #263352;
+  border-color: #263352;
+  color: #F7F5EF;
 }
 
 .tag-chip{
@@ -652,7 +697,6 @@ button, input, textarea, select{
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-left: auto;
 }
 .sort-control label{
   font-family: var(--font-mono);
@@ -716,6 +760,26 @@ button, input, textarea, select{
 
 .link-card.is-favorite{
   border-left: 3px solid var(--copper);
+}
+
+.link-card.has-problem{
+  border-left: 3px solid var(--danger);
+}
+
+/* If a node is both a favorite AND broken, the problem state takes visual
+   priority — knowing a link is dead is more actionable than the favorite mark. */
+.link-card.is-favorite.has-problem{
+  border-left: 3px solid var(--danger);
+}
+
+.link-card.is-recent{
+  animation: card-in 0.22s ease backwards, recent-highlight 2.6s ease-out;
+}
+
+@keyframes recent-highlight{
+  0%{ box-shadow: 0 0 0 2px var(--good); border-color: var(--good); }
+  15%{ box-shadow: 0 0 0 2px var(--good); border-color: var(--good); }
+  100%{ box-shadow: 0 0 0 0 transparent; }
 }
 
 .link-favicon{
@@ -801,12 +865,21 @@ button, input, textarea, select{
   color: #F7F5EF;
 }
 
-.link-meta{
+.link-footer-row{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
   margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.link-meta{
   font-family: var(--font-mono);
   font-size: 10.5px;
   color: var(--ink-soft);
   opacity: 0.7;
+  margin: 0;
 }
 
 .link-actions{
@@ -1059,6 +1132,11 @@ button, input, textarea, select{
   background: currentColor;
 }
 
+.link-health-badge .health-mark{
+  font-size: 8px;
+  line-height: 1;
+}
+
 /* ---------- Drag & drop reordering ---------- */
 
 .link-card.is-dragging{
@@ -1072,22 +1150,47 @@ button, input, textarea, select{
   box-shadow: inset 0 -3px 0 var(--indigo);
 }
 
-.drag-handle{
-  cursor: grab;
-  color: var(--ink-soft);
-  opacity: 0.4;
-  font-size: 13px;
-  padding: 4px 2px;
+.drag-handle-group{
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
   align-self: center;
+  opacity: 0.5;
   transition: opacity 0.12s ease;
-  touch-action: none;
 }
-.link-card:hover .drag-handle{ opacity: 0.9; }
-.drag-handle:active{ cursor: grabbing; }
+.link-card:hover .drag-handle-group,
+.drag-handle-group:focus-within{
+  opacity: 1;
+}
 
-/* Manual reordering only makes sense when sort mode is "manual" */
-.link-list:not(.sort-manual) .drag-handle{
-  visibility: hidden;
+.drag-handle{
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--ink-soft);
+  font-size: 9px;
+  line-height: 1;
+  padding: 3px 4px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+.drag-handle:hover{
+  background: var(--paper);
+  color: var(--indigo);
+}
+
+.drag-handle-icon{
+  color: var(--ink-soft);
+  font-size: 12px;
+  line-height: 1;
+  padding: 1px 0;
+}
+
+/* When not in manual sort mode, the handle icon collapses instead of just
+   hiding, so it doesn't reserve dead space in the card's grid layout. */
+.drag-handle-idle{
+  display: none;
 }
 
 /* ---------- Compact density ---------- */
@@ -1106,7 +1209,7 @@ button, input, textarea, select{
 .link-list.density-compact .link-url,
 .link-list.density-compact .link-notes,
 .link-list.density-compact .link-tags,
-.link-list.density-compact .link-meta{
+.link-list.density-compact .link-footer-row{
   display: none;
 }
 .link-list.density-compact .link-actions{
