@@ -139,3 +139,21 @@ link-manager/
 ## Data backup
 
 Besides the automatic daily backup in `data/backups/`, your links always live in `data/links.json` — a plain JSON file, easy to copy or version manually. You can also use the **Export .json** button in the UI at any time.
+
+## Or you can use
+
+```yaml
+services:
+  link-manager:
+    image: fro103/linkmanager:latest
+    container_name: link-manager
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - DATA_DIR=/app/data
+      - BACKUP_RETENTION=14
+      - LINK_CHECK_INTERVAL_HOURS=24
+```
