@@ -5,10 +5,12 @@ A web app for managing a personal collection of links ("nodes"): add, edit, dele
 ## Start with Docker (recommended)
 
 Prerequisite: Docker and Docker Compose installed.
+```bash
 sudo curl -fsSL https://get.docker.com | sh
 sudo systemctl enable --now docker
 sudo usermod -aG docker $USER
 docker --version
+```
 
 ```bash
 docker compose up -d --build
