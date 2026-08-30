@@ -1,0 +1,78 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        # Node 20 matches the Dockerfile's base image; Node 22 is the current
+        # LTS at the time this workflow was written. Testing both catches
+        # anything that only breaks on one of them.
+        node-version: [20.x, 22.x]
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run test suite
+        run: npm test
+
+      - name: Verify the server boots (smoke test)
+        run: |
+          PORT=3999 DATA_DIR=/tmp/link-manager-ci-data node server.js &
+          SERVER_PID=$!
+          for i in $(seq 1 20); do
+            if curl -sf http://localhost:3999/api/health > /dev/null; then
+              echo "Server is healthy"
+              kill $SERVER_PID
+              exit 0
+            fi
+            sleep 0.5
+          done
+          echo "Server did not become healthy in time"
+          kill $SERVER_PID 2>/dev/null || true
+          exit 1
+
+  docker-build:
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t link-manager:ci .
+
+      - name: Run container and check health endpoint
+        run: |
+          docker run -d --name link-manager-ci -p 3000:3000 link-manager:ci
+          for i in $(seq 1 20); do
+            if curl -sf http://localhost:3000/api/health > /dev/null; then
+              echo "Container is healthy"
+              docker logs link-manager-ci
+              docker rm -f link-manager-ci
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Container did not become healthy in time"
+          docker logs link-manager-ci
+          docker rm -f link-manager-ci
+          exit 1

@@ -1,12 +1,15 @@
 {
   "name": "link-manager",
   "version": "1.0.0",
-  "description": "Link manager - add, edit, delete, and filter links",
+  "description": "Link manager - add, edit, delete, and filter links (SQLite-backed)",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "node --test test/*.test.js"
   },
   "dependencies": {
+    "better-sqlite3": "12.11.1",
+    "compression": "^1.8.1",
     "express": "^4.19.2"
   }
 }

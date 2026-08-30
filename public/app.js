@@ -2,11 +2,27 @@
 // Nodes — Link Manager
 // Persistence: server REST API (Express), stored in data/links.json
 // ============================================================
+//
+// This file is the app "core": shared state (links, filters, edit mode) and
+// all the rendering/event-wiring logic that reads and mutates that state
+// through closures. It's intentionally kept as one module rather than split
+// further, because further splitting would mean threading ~15 pieces of
+// mutable state and ~40 DOM references through explicit imports/exports
+// between files — real work, but not safe to do quickly without a strong
+// risk of silently breaking a closure reference. The pieces that *were*
+// genuinely self-contained (no shared state, just parameters and the DOM)
+// have been extracted to js/utils.js, js/focus-trap.js, and js/api.js.
+
+import { escapeHtml, normalizeUrl, faviconFor, hostnameFor, formatDate, timeAgo } from './js/utils.js';
+import { trapFocus, releaseFocusTrap, setupGlobalFocusTrapHandler } from './js/focus-trap.js';
+import {
+  apiList, apiCreate, apiUpdate, apiDelete, apiBulkDelete, apiReorder,
+  apiCheckOne, apiCheckAll, apiCheckCancel, apiCheckStatus, apiPreview,
+  apiImportBookmarks, apiImportJson, apiStats, apiDuplicates,
+} from './js/api.js';
 
 (() => {
   'use strict';
-
-  const API = '/api/links';
 
   /** @type {{id:string,url:string,title:string,tags:string[],description:string,favorite:boolean,order:number,linkStatus:string|null,linkStatusCode:number|null,lastCheckedAt:string|null,createdAt:string,updatedAt:string}[]} */
   let links = [];
@@ -68,6 +84,7 @@
   const moreMenu        = $('#moreMenu');
   const checkProgress   = $('#checkProgress');
   const checkProgressText = $('#checkProgressText');
+  const btnCancelCheck  = $('#btnCancelCheck');
   const activeFiltersBar = $('#activeFiltersBar');
   const activeFiltersLabel = $('#activeFiltersLabel');
   const btnClearFilters = $('#btnClearFilters');
@@ -114,49 +131,9 @@
   const previewEmpty    = $('#previewEmpty');
 
   // ---------- Utilities ----------
-
-  function escapeHtml(str) {
-    return String(str)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
-  }
-
-  function normalizeUrl(raw) {
-    let value = raw.trim();
-    if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(value)) {
-      value = 'https://' + value;
-    }
-    return value;
-  }
-
-  function faviconFor(url) {
-    try {
-      const u = new URL(url);
-      return `https://www.google.com/s2/favicons?sz=64&domain=${u.hostname}`;
-    } catch {
-      return null;
-    }
-  }
-
-  function hostnameFor(url) {
-    try {
-      return new URL(url).hostname.replace(/^www\./, '');
-    } catch {
-      return url;
-    }
-  }
-
-  function formatDate(iso) {
-    try {
-      const d = new Date(iso);
-      return d.toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' });
-    } catch {
-      return '';
-    }
-  }
+  // escapeHtml, normalizeUrl, faviconFor, hostnameFor, formatDate, timeAgo
+  // now live in js/utils.js (imported above). showToast and setStatus stay
+  // here since they close over local DOM refs (toastEl, fileStatus).
 
   function showToast(message, type = 'default') {
     toastEl.textContent = message;
@@ -172,181 +149,25 @@
     fileStatus.querySelector('.status-label').textContent = label;
   }
 
-  function timeAgo(iso) {
-    if (!iso) return null;
-    const diffMs = Date.now() - new Date(iso).getTime();
-    const mins = Math.round(diffMs / 60000);
-    if (mins < 1) return 'just now';
-    if (mins < 60) return `${mins} min ago`;
-    const hours = Math.round(mins / 60);
-    if (hours < 24) return `${hours}h ago`;
-    const days = Math.round(hours / 24);
-    return `${days}d ago`;
-  }
-
-  // ---------- Focus trap (accessibility) ----------
-  // Keeps Tab/Shift+Tab cycling inside the active modal instead of leaking
-  // focus out to the page behind it. One trap is active at a time.
-
-  let activeFocusTrap = null;
-
-  function getFocusableEls(container) {
-    const selector = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
-    return Array.from(container.querySelectorAll(selector)).filter(el => el.offsetParent !== null);
-  }
-
-  function trapFocus(container, restoreEl) {
-    activeFocusTrap = { container, restoreEl: restoreEl || document.activeElement };
-    const focusable = getFocusableEls(container);
-    if (focusable.length > 0) focusable[0].focus();
-  }
-
-  function releaseFocusTrap() {
-    if (activeFocusTrap && activeFocusTrap.restoreEl && document.body.contains(activeFocusTrap.restoreEl)) {
-      activeFocusTrap.restoreEl.focus();
-    }
-    activeFocusTrap = null;
-  }
-
-  function setupGlobalFocusTrapHandler() {
-    document.addEventListener('keydown', (e) => {
-      if (e.key !== 'Tab' || !activeFocusTrap) return;
-      const focusable = getFocusableEls(activeFocusTrap.container);
-      if (focusable.length === 0) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-
-      if (e.shiftKey && document.activeElement === first) {
-        e.preventDefault();
-        last.focus();
-      } else if (!e.shiftKey && document.activeElement === last) {
-        e.preventDefault();
-        first.focus();
-      } else if (!activeFocusTrap.container.contains(document.activeElement)) {
-        // Focus somehow escaped the trap (e.g. programmatic focus elsewhere) — pull it back in.
-        e.preventDefault();
-        first.focus();
-      }
-    });
-  }
-
   // ---------- API ----------
+  // apiList/apiCreate/.../apiDuplicates now live in js/api.js (imported
+  // above). exportAsDownload stays here since it calls showToast.
 
-  async function apiList() {
-    const res = await fetch(API);
-    if (!res.ok) throw new Error('Failed to load');
-    return res.json();
-  }
-
-  async function apiCreate(payload) {
-    const res = await fetch(API, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Error creating node');
-    return data;
-  }
-
-  async function apiUpdate(id, payload) {
-    const res = await fetch(`${API}/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Error updating node');
-    return data;
-  }
-
-  async function apiDelete(id) {
-    const res = await fetch(`${API}/${id}`, { method: 'DELETE' });
-    if (!res.ok) {
-      const data = await res.json();
-      throw new Error(data.error || 'Error removing node');
+  async function exportAsDownload() {
+    // Downloads straight from the server's /api/export rather than re-serializing
+    // the in-memory `links` array — this stays correct even if the client's copy
+    // is stale, since the list view is paginated client-side.
+    try {
+      const a = document.createElement('a');
+      a.href = '/api/export';
+      a.download = 'links.json';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      showToast('.json file downloaded', 'success');
+    } catch (err) {
+      showToast('Error exporting', 'error');
     }
-  }
-
-  async function apiReorder(orderedIds) {
-    const res = await fetch(`${API}/reorder`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ orderedIds }),
-    });
-    if (!res.ok) throw new Error('Error saving new order');
-  }
-
-  async function apiCheckOne(id) {
-    const res = await fetch(`${API}/${id}/check`, { method: 'POST' });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Error checking link');
-    return data;
-  }
-
-  async function apiCheckAll() {
-    const res = await fetch(`${API}/check-all`, { method: 'POST' });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Error checking links');
-    return data;
-  }
-
-  async function apiCheckStatus() {
-    const res = await fetch(`${API}/check-status`);
-    return res.json();
-  }
-
-  async function apiPreview(url) {
-    const res = await fetch(`/api/preview?url=${encodeURIComponent(url)}`);
-    if (!res.ok) return null;
-    return res.json();
-  }
-
-  async function apiImportBookmarks(html, defaultTags) {
-    const res = await fetch('/api/import/bookmarks', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ html, defaultTags }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Error importing bookmarks');
-    return data;
-  }
-
-  async function apiImportJson(items, defaultTags) {
-    const res = await fetch('/api/import/json', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ items, defaultTags }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Error importing file');
-    return data;
-  }
-
-  async function apiStats() {
-    const res = await fetch('/api/stats');
-    if (!res.ok) throw new Error('Error fetching statistics');
-    return res.json();
-  }
-
-  async function apiDuplicates() {
-    const res = await fetch('/api/duplicates');
-    if (!res.ok) throw new Error('Error fetching duplicates');
-    return res.json();
-  }
-
-  function exportAsDownload() {
-    const blob = new Blob([JSON.stringify(links, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'links.json';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-    showToast('.json file downloaded', 'success');
   }
 
   // ---------- CRUD ----------
@@ -421,16 +242,17 @@
     btnSubmit.disabled = true;
     try {
       if (editingId) {
-        await apiUpdate(editingId, payload);
+        const updated = await apiUpdate(editingId, payload);
         showToast('Node updated', 'success');
         exitEditMode();
+        upsertLocal(updated);
       } else {
         const created = await apiCreate(payload);
         showToast('Node added', 'success');
         form.reset();
         markRecentlyAdded(created.id);
+        upsertLocal(created);
       }
-      await refresh();
       if (isComposerCollapsible()) closeComposerPanel();
     } catch (err) {
       formError.textContent = err.message;
@@ -460,8 +282,8 @@
       await apiDelete(pendingDeleteId);
       if (editingId === pendingDeleteId) exitEditMode();
       showToast(`"${link ? link.title : 'Node'}" removed`);
+      removeLocal(pendingDeleteId);
       closeConfirm();
-      await refresh();
     } catch (err) {
       showToast(err.message, 'error');
       closeConfirm();
@@ -472,8 +294,8 @@
     const link = links.find(l => l.id === id);
     if (!link) return;
     try {
-      await apiUpdate(id, { favorite: !link.favorite });
-      await refresh();
+      const updated = await apiUpdate(id, { favorite: !link.favorite });
+      upsertLocal(updated);
     } catch (err) {
       showToast(err.message, 'error');
     }
@@ -488,6 +310,24 @@
       setStatus('error', 'Connection failed');
       showToast('Could not reach the server', 'error');
     }
+  }
+
+  // Patches the in-memory `links` array from a single mutation's response and
+  // re-renders, instead of re-fetching the whole collection. Safe for actions
+  // that don't change any other item's `order` or other server-computed field —
+  // create/update/delete of one item. Reorder, import, check-all, and restore
+  // still call refresh(), since those can touch fields on many items at once
+  // in ways only the server knows about.
+  function upsertLocal(updatedOrCreated) {
+    const idx = links.findIndex(l => l.id === updatedOrCreated.id);
+    if (idx === -1) links.push(updatedOrCreated);
+    else links[idx] = updatedOrCreated;
+    render();
+  }
+
+  function removeLocal(id) {
+    links = links.filter(l => l.id !== id);
+    render();
   }
 
   // ---------- Rendering ----------
@@ -902,7 +742,7 @@
     resetPaginationAndRender();
   });
 
-  btnExport.addEventListener('click', exportAsDownload);
+  btnExport.addEventListener('click', () => { closeMoreMenu(); exportAsDownload(); });
   $('#btnToggleTheme').addEventListener('click', toggleTheme);
   btnToggleView.addEventListener('click', toggleView);
 
@@ -1010,10 +850,26 @@
       await refresh();
       showToast('Check complete', 'success');
     } catch (err) {
+      // A cancellation surfaces here as a normal failed request (the connection
+      // completes once the server finishes cleaning up); refresh either way so
+      // whatever got checked before cancelling is reflected in the list.
+      await refresh();
       showToast(err.message, 'error');
     } finally {
       btnCheckLinks.disabled = false;
       checkProgress.classList.add('hidden');
+    }
+  }
+
+  async function cancelCheckNow() {
+    btnCancelCheck.disabled = true;
+    try {
+      await apiCheckCancel();
+      showToast('Cancelling…');
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      btnCancelCheck.disabled = false;
     }
   }
 
@@ -1376,7 +1232,14 @@
       }
       duplicatesContent.innerHTML = groups.map(group => `
         <div class="duplicate-group">
-          <p class="duplicate-group-url">${escapeHtml(group[0].url)}</p>
+          <div class="duplicate-group-header">
+            <p class="duplicate-group-url">${escapeHtml(group[0].url)}</p>
+            <button class="btn btn-ghost btn-small" data-action="keep-first-in-group"
+              data-ids="${group.slice(1).map(l => l.id).join(',')}"
+              title="Remove every copy in this group except the oldest one">
+              Keep oldest, remove ${group.length - 1}
+            </button>
+          </div>
           ${group.map(l => `
             <div class="duplicate-item">
               <span class="duplicate-item-title">${escapeHtml(l.title)}</span>
@@ -1397,15 +1260,35 @@
   }
 
   duplicatesContent.addEventListener('click', async (e) => {
-    const btn = e.target.closest('[data-action="delete-duplicate"]');
-    if (!btn) return;
-    try {
-      await apiDelete(btn.dataset.id);
-      showToast('Node removed', 'success');
-      await refresh();
-      await openDuplicatesModal();
-    } catch (err) {
-      showToast(err.message, 'error');
+    const singleBtn = e.target.closest('[data-action="delete-duplicate"]');
+    if (singleBtn) {
+      try {
+        await apiDelete(singleBtn.dataset.id);
+        showToast('Node removed', 'success');
+        await refresh();
+        await openDuplicatesModal();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+      return;
+    }
+
+    const bulkBtn = e.target.closest('[data-action="keep-first-in-group"]');
+    if (bulkBtn) {
+      const ids = bulkBtn.dataset.ids.split(',').filter(Boolean);
+      if (ids.length === 0) return;
+      const confirmed = window.confirm(`Remove ${ids.length} duplicate node(s), keeping the oldest?`);
+      if (!confirmed) return;
+      bulkBtn.disabled = true;
+      try {
+        const result = await apiBulkDelete(ids);
+        showToast(`${result.deleted} node(s) removed`, 'success');
+        await refresh();
+        await openDuplicatesModal();
+      } catch (err) {
+        showToast(err.message, 'error');
+        bulkBtn.disabled = false;
+      }
     }
   });
 
@@ -1574,6 +1457,7 @@
     duplicatesOverlay.addEventListener('click', (e) => { if (e.target === duplicatesOverlay) closeDuplicatesModal(); });
 
     btnCheckLinks.addEventListener('click', () => { closeMoreMenu(); checkAllLinksNow(); });
+    btnCancelCheck.addEventListener('click', cancelCheckNow);
     btnToggleDensity.addEventListener('click', toggleDensity);
 
     setupMoreMenu();

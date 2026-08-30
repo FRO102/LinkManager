@@ -12,3 +12,27 @@ services:
       - DATA_DIR=/app/data
       # - BACKUP_RETENTION=14           # number of daily backups to keep (default: 14)
       # - LINK_CHECK_INTERVAL_HOURS=24  # how often automatic link checking runs (default: 24h)
+      # - IMPORT_MAX_ITEMS=5000         # max links accepted per import call (default: 5000)
+      # - AUTH_TOKEN=                   # if set, all /api requests must send this in the X-Auth-Token header
+                                         # (leave unset for local/trusted-network use — off by default)
+    # Mirrors the Dockerfile's HEALTHCHECK explicitly here so `docker compose ps`
+    # shows container health directly, and so any dependent service (see the
+    # commented example below) can wait on it via service_healthy.
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/api/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 30s
+      timeout: 3s
+      start_period: 5s
+      retries: 3
+
+# If you ever add a second service that depends on link-manager (e.g. a
+# reverse proxy in front of it), have it wait for a healthy container
+# instead of just "started", so it doesn't come up before the app can
+# actually serve requests:
+#
+#   reverse-proxy:
+#     image: caddy:2
+#     depends_on:
+#       link-manager:
+#         condition: service_healthy
+#     ...

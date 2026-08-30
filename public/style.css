@@ -239,6 +239,11 @@ button, input, textarea, select{
   font-weight: 500;
   cursor: pointer;
   transition: transform 0.12s ease, background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+  /* .btn is also used on <a> elements (e.g. the Nodes <-> Notes nav link) —
+     these two properties make a link render and behave like the buttons
+     it sits next to, instead of inheriting default inline anchor styling. */
+  display: inline-block;
+  text-decoration: none;
 }
 
 .btn:hover{ transform: translateY(-1px); }
@@ -299,6 +304,13 @@ button, input, textarea, select{
   grid-template-columns: 320px 1fr;
   gap: 0;
   align-items: start;
+}
+
+/* Used by the notes page, which has no sidebar composer (writing happens in
+   a modal instead, opened via the "+ Add note" header button) — the
+   collection section just takes the full width. */
+.layout-full-width{
+  grid-template-columns: 1fr;
 }
 
 @media (max-width: 860px){
@@ -457,6 +469,65 @@ button, input, textarea, select{
 }
 
 .field textarea{ resize: vertical; min-height: 44px; }
+
+/* The notes page's content textarea (rows="14") is a small editor rather
+   than a short optional-context field like links' field-notes — give it
+   more room and a monospace-friendly line height without touching the
+   shared .field/.field textarea rules other pages rely on. */
+.field-content textarea{
+  min-height: 480px;
+  line-height: 1.5;
+  /* auto-resize (grown via JS by setting an inline height) still respects
+     manual resize, but starts from this min-height rather than the ~44px
+     default used elsewhere. */
+  overflow-y: hidden;
+}
+
+/* Shown while dragging a text file over the content textarea, so the drop
+   target is obvious before the user releases the file. */
+.field-content textarea.is-drop-target{
+  border-color: var(--indigo);
+  border-style: dashed;
+  background: var(--paper);
+  box-shadow: 0 0 0 3px var(--indigo-soft, rgba(90,107,150,0.25));
+}
+
+.field-content-label-row{
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.field-content-hints{
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.content-drop-hint{
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink-soft);
+  white-space: nowrap;
+  opacity: 0.75;
+}
+
+.content-counter{
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+.content-counter.is-near-limit{ color: var(--copper); }
+
+@media (max-width: 480px){
+  /* Not enough room for both hints on very narrow screens — the textarea's
+     placeholder still mentions drag-and-drop, so this is a nice-to-have
+     that can drop off rather than crowding the character counter. */
+  .content-drop-hint{ display: none; }
+}
 
 .checkbox-row{
   display: flex;
@@ -841,6 +912,22 @@ button, input, textarea, select{
   line-height: 1.5;
 }
 
+/* .note-content-preview reuses .link-notes but is a <button> (so the whole
+   preview snippet is clickable to open the reading modal) rather than a
+   <p> — strip button chrome so it still reads as plain text. */
+.note-content-preview{
+  appearance: none;
+  border: none;
+  background: transparent;
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0;
+  cursor: pointer;
+  font-family: var(--font-body);
+}
+.note-content-preview:hover{ color: var(--ink); }
+
 .link-tags{
   display: flex;
   flex-wrap: wrap;
@@ -960,7 +1047,11 @@ button, input, textarea, select{
 .confirm-overlay{
   position: fixed;
   inset: 0;
-  z-index: 50;
+  /* Above the FAB (z-index: 55, see the mobile @media block above) so
+     confirm/import/stats/note-view modals aren't visually pierced by the
+     floating add button on mobile — the modal being open should mean
+     nothing else on the page is interactive or visible above it. */
+  z-index: 56;
   background: rgba(31, 36, 33, 0.45);
   display: flex;
   align-items: center;
@@ -1096,6 +1187,28 @@ button, input, textarea, select{
 
 @keyframes spin{
   to{ transform: rotate(360deg); }
+}
+
+.check-progress-cancel{
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-soft);
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 2px 8px;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.check-progress-cancel:hover:not(:disabled){
+  color: var(--ink);
+  border-color: var(--ink-soft);
+}
+
+.check-progress-cancel:disabled{
+  opacity: 0.5;
+  cursor: default;
 }
 
 /* ---------- Link health status (ok / broken / blocked / unchecked) ---------- */
@@ -1349,6 +1462,148 @@ input[type="file"]{
 }
 .stat-tile.stat-broken .stat-value{ color: var(--danger); }
 
+/* ---------- Note reading view ---------- */
+
+.note-view-box{
+  max-width: 1920px;
+  width: 94vw;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  /* Safety net for the edit/add modal (which reuses this class): if the
+     form's content (title + tags + a tall auto-resized textarea + checkbox
+     + buttons) exceeds max-height, the whole box scrolls rather than
+     clipping the save/cancel buttons off-screen. The reading view's own
+     .note-view-body already scrolls internally and doesn't need this, but
+     it's harmless there too since that content rarely reaches the modal's
+     own max-height on top of the body's.
+  */
+  overflow-y: auto;
+}
+
+/* The add/edit modal is for writing, not just reading — taller than the
+   plain .note-view-box default so the (now much taller, min-height: 480px)
+   content textarea has real room to work in. Width now matches
+   .note-view-box's 1920px cap (both are effectively width: 94vw on any
+   screen up to that size) rather than a separate, smaller value, so the
+   edit modal isn't narrower than the reading one.
+*/
+.note-edit-box{
+  max-height: 94vh;
+}
+
+.note-view-header{
+  align-items: flex-start;
+  margin-bottom: 12px;
+  gap: 12px;
+}
+
+.note-view-heading{
+  min-width: 0; /* allows the long title to wrap/ellipsis instead of overflowing */
+  flex: 1;
+}
+
+.note-view-heading h3{
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.25;
+  margin: 0 0 6px;
+  word-break: break-word;
+}
+
+.note-view-meta{
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--ink-soft);
+  margin: 0;
+}
+
+.note-view-nav{
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  /* Sits between the title and the close button, so it needs its own top
+     margin to align with the close button rather than the (taller) title. */
+  margin-top: 2px;
+}
+
+.note-view-position{
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink-soft);
+  white-space: nowrap;
+  padding: 0 4px;
+  min-width: 52px;
+  text-align: center;
+}
+
+.note-view-nav .icon-btn:disabled{
+  opacity: 0.35;
+  cursor: default;
+}
+.note-view-nav .icon-btn:disabled:hover{
+  background: var(--paper);
+  color: var(--ink-soft);
+}
+
+.note-view-tags{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.note-view-body{
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--ink);
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 80px;
+  max-height: 65vh;
+  padding: 18px 20px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.note-view-body.is-empty{
+  color: var(--ink-soft);
+  font-style: italic;
+}
+
+.note-view-actions{
+  margin-top: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.note-view-actions-right{
+  display: flex;
+  gap: 8px;
+}
+
+#viewNoteFavorite.is-favorited{
+  color: var(--copper);
+  border-color: var(--copper-soft);
+}
+
+@media (max-width: 640px){
+  .note-view-box{ width: 94vw; padding: 18px; }
+  .note-view-heading h3{ font-size: 20px; }
+  .note-view-header{ flex-wrap: wrap; }
+  .note-view-nav{ order: 1; margin-left: auto; }
+  .note-view-actions{ flex-direction: column-reverse; align-items: stretch; }
+  .note-view-actions-right{ flex-direction: column; }
+}
+
 /* ---------- Duplicates ---------- */
 
 .duplicates-content{
@@ -1371,6 +1626,23 @@ input[type="file"]{
   color: var(--ink-soft);
   margin: 0 0 8px;
   word-break: break-all;
+}
+.duplicate-group-header{
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.duplicate-group-header .duplicate-group-url{
+  margin-bottom: 0;
+  flex: 1;
+}
+.btn-small{
+  font-size: 11px;
+  padding: 4px 8px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 .duplicate-item{
   display: flex;

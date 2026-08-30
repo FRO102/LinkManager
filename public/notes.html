@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Nodes — Link Manager</title>
+<title>Notes — Link Manager</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -12,10 +12,10 @@
 
 <header class="topbar">
   <div class="brand">
-    <span class="brand-mark">◈</span>
+    <span class="brand-mark">✎</span>
     <div class="brand-text">
-      <h1>Nodes</h1>
-      <p class="brand-sub">your personal link catalog</p>
+      <h1>Notes</h1>
+      <p class="brand-sub">documentation &amp; notes</p>
     </div>
   </div>
 
@@ -25,7 +25,7 @@
       <span class="status-label">Connected to server</span>
     </span>
     <div class="file-buttons">
-      <a class="btn btn-ghost" href="notes.html" title="Go to Notes">Notes →</a>
+      <a class="btn btn-ghost" href="index.html" title="Go to Nodes (links)">← Nodes</a>
       <div class="overflow-menu-wrap">
         <button class="btn btn-ghost" id="btnMoreMenu" aria-haspopup="true" aria-expanded="false" title="More actions">
           Actions
@@ -33,75 +33,25 @@
         </button>
         <div class="overflow-menu hidden" id="moreMenu" role="menu">
           <button class="overflow-menu-item" id="btnStats" role="menuitem" title="View collection statistics">Statistics</button>
-          <button class="overflow-menu-item" id="btnDuplicates" role="menuitem" title="View duplicate nodes">Duplicates</button>
-          <button class="overflow-menu-item" id="btnCheckLinks" role="menuitem" title="Check all links now">Check links</button>
-          <button class="overflow-menu-item" id="btnImport" role="menuitem" title="Import bookmarks or links.json">Import</button>
-          <button class="overflow-menu-item" id="btnExport" role="menuitem" title="Download a copy as links.json">Export .json</button>
+          <button class="overflow-menu-item" id="btnImport" role="menuitem" title="Import notes.json">Import</button>
+          <button class="overflow-menu-item" id="btnExport" role="menuitem" title="Download a copy as notes.json">Export .json</button>
         </div>
       </div>
       <button class="btn btn-ghost" id="btnToggleTheme" title="Toggle theme">🌗</button>
+      <button class="btn btn-primary" id="btnAddNote" title="Add a new note">+ Add note</button>
     </div>
   </div>
 </header>
 
-<main class="layout">
-
-  <section class="composer" aria-labelledby="composerTitle" id="composerPanel">
-    <div class="composer-panel-header">
-      <h2 id="composerTitle" class="section-eyebrow">01 — Add node</h2>
-      <button type="button" class="btn-icon-close composer-close" id="btnCloseComposer" aria-label="Close">✕</button>
-    </div>
-
-    <form id="linkForm" class="link-form" autocomplete="off">
-      <input type="hidden" id="editingId">
-
-      <div class="field field-url">
-        <label for="inputUrl">Address (URL)</label>
-        <input type="url" id="inputUrl" name="url" placeholder="https://example.com/page" required>
-      </div>
-
-      <div class="field">
-        <label for="inputTitle">Title</label>
-        <input type="text" id="inputTitle" name="title" placeholder="Display name" required>
-      </div>
-
-      <div class="field">
-        <label for="inputTags">Tags</label>
-        <input type="text" id="inputTags" name="tags" placeholder="work, reading, tool (comma-separated)">
-      </div>
-
-      <div class="field field-notes">
-        <label for="inputNotes">Notes</label>
-        <textarea id="inputNotes" name="notes" rows="2" placeholder="Optional context…"></textarea>
-      </div>
-
-      <div class="field field-favorite">
-        <label class="checkbox-row" for="inputFavorite">
-          <input type="checkbox" id="inputFavorite" name="favorite">
-          <span>Mark as favorite</span>
-        </label>
-      </div>
-
-      <p class="form-error hidden" id="formError"></p>
-
-      <button type="submit" class="btn btn-primary btn-add" id="btnSubmit">Save node</button>
-      <button type="button" class="btn btn-ghost btn-cancel-edit hidden" id="btnCancelEdit">Cancel edit</button>
-    </form>
-  </section>
-
-  <div class="composer-overlay hidden" id="composerOverlay"></div>
-
-  <button type="button" class="fab" id="btnFab" title="Add node" aria-label="Add node">
-    <svg width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M11 4V18M4 11H18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-  </button>
+<main class="layout layout-full-width">
 
   <section class="collection" aria-labelledby="collectionTitle">
     <div class="collection-header">
-      <h2 id="collectionTitle" class="section-eyebrow">02 — Collection</h2>
+      <h2 id="collectionTitle" class="section-eyebrow">Collection</h2>
 
       <div class="toolbar">
         <div class="toolbar-row toolbar-row-search">
-          <input type="search" id="searchInput" class="search-input" placeholder="Search title, URL, tag, or note…">
+          <input type="search" id="searchInput" class="search-input" placeholder="Search title, content, or tag…">
         </div>
 
         <div class="toolbar-row toolbar-row-filters">
@@ -138,35 +88,29 @@
         <span class="active-filters-label" id="activeFiltersLabel"></span>
         <button type="button" class="clear-filters-btn" id="btnClearFilters">Clear all filters</button>
       </div>
-
-      <div class="check-progress hidden" id="checkProgress">
-        <span class="spinner" aria-hidden="true"></span>
-        <span id="checkProgressText">Checking links…</span>
-        <button type="button" class="check-progress-cancel" id="btnCancelCheck">Cancel</button>
-      </div>
     </div>
 
-    <p class="count-line" id="countLine" aria-live="polite">0 nodes saved</p>
+    <p class="count-line" id="countLine" aria-live="polite">0 notes saved</p>
 
     <ul class="link-list" id="linkList"></ul>
 
     <div class="empty-state" id="emptyState">
       <span class="empty-mark">◇</span>
-      <p>No nodes in the collection yet.</p>
-      <p class="empty-sub">Add your first address in the panel on the left.</p>
+      <p>No notes in the collection yet.</p>
+      <p class="empty-sub">Click "+ Add note" above to write your first one.</p>
     </div>
   </section>
 
 </main>
 
 <footer class="footbar">
-  <p><span id="footerCount">0</span> nodes · persisted on the server at <code>data/links.json</code></p>
+  <p><span id="footerCount">0</span> notes · persisted on the server in <code>data/links.db</code></p>
 </footer>
 
 <!-- Delete confirmation -->
 <div id="confirmOverlay" class="confirm-overlay hidden">
   <div class="confirm-box" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle">
-    <h3 id="confirmTitle">Remove node?</h3>
+    <h3 id="confirmTitle">Remove note?</h3>
     <p id="confirmText"></p>
     <div class="confirm-actions">
       <button class="btn btn-ghost" id="confirmCancel">Cancel</button>
@@ -179,26 +123,12 @@
 <div id="importOverlay" class="confirm-overlay hidden">
   <div class="confirm-box modal-box" role="dialog" aria-modal="true" aria-labelledby="importTitle">
     <div class="modal-box-header">
-      <h3 id="importTitle">Import nodes</h3>
+      <h3 id="importTitle">Import notes</h3>
       <button class="btn-icon-close" id="importClose" aria-label="Close">✕</button>
     </div>
 
-    <div class="import-tabs" role="tablist">
-      <button class="import-tab active" id="tabBookmarks" data-tab="bookmarks" role="tab" aria-selected="true">Bookmarks (.html)</button>
-      <button class="import-tab" id="tabJson" data-tab="json" role="tab" aria-selected="false">.json file</button>
-    </div>
-
-    <div class="import-panel" id="panelBookmarks">
-      <p class="import-hint">Export your bookmarks from Chrome, Firefox, or Edge as HTML and upload it here.</p>
-      <input type="file" id="fileBookmarks" accept=".html,.htm">
-      <div class="field">
-        <label for="importTagsBookmarks">Tag to apply to all (optional)</label>
-        <input type="text" id="importTagsBookmarks" placeholder="e.g. imported-chrome">
-      </div>
-    </div>
-
-    <div class="import-panel hidden" id="panelJson">
-      <p class="import-hint">Upload a <code>links.json</code> file exported from this app (or another instance).</p>
+    <div class="import-panel" id="panelJson">
+      <p class="import-hint">Upload a <code>notes.json</code> file exported from this app (or another instance).</p>
       <input type="file" id="fileJson" accept=".json">
       <div class="field">
         <label for="importTagsJson">Tag to apply to all (optional)</label>
@@ -229,30 +159,85 @@
   </div>
 </div>
 
-<!-- Duplicates modal -->
-<div id="duplicatesOverlay" class="confirm-overlay hidden">
-  <div class="confirm-box modal-box" role="dialog" aria-modal="true" aria-labelledby="duplicatesTitle">
-    <div class="modal-box-header">
-      <h3 id="duplicatesTitle">Duplicate nodes</h3>
-      <button class="btn-icon-close" id="duplicatesClose" aria-label="Close">✕</button>
+<!-- Note reading view -->
+<div id="viewNoteOverlay" class="confirm-overlay hidden">
+  <div class="confirm-box modal-box note-view-box" role="dialog" aria-modal="true" aria-labelledby="viewNoteTitle">
+    <div class="modal-box-header note-view-header">
+      <div class="note-view-heading" aria-live="polite">
+        <h3 id="viewNoteTitle"></h3>
+        <p class="note-view-meta" id="viewNoteMeta"></p>
+      </div>
+      <div class="note-view-nav" role="group" aria-label="Note navigation">
+        <button type="button" class="icon-btn" id="viewNotePrev" title="Previous note (← / ↑)" aria-label="Previous note">‹</button>
+        <span class="note-view-position" id="viewNotePosition" aria-live="polite"></span>
+        <button type="button" class="icon-btn" id="viewNoteNext" title="Next note (→ / ↓)" aria-label="Next note">›</button>
+      </div>
+      <button class="btn-icon-close" id="viewNoteClose" aria-label="Close">✕</button>
     </div>
-    <div id="duplicatesContent" class="duplicates-content"></div>
+    <div class="note-view-tags" id="viewNoteTags"></div>
+    <div class="note-view-body" id="viewNoteBody"></div>
+    <div class="confirm-actions note-view-actions">
+      <button class="btn btn-ghost" id="viewNoteFavorite">☆ Add to favorites</button>
+      <div class="note-view-actions-right">
+        <button class="btn btn-ghost" id="viewNoteExportTxt" title="Download this note as a .txt file">Export .txt</button>
+        <button class="btn btn-ghost" id="viewNoteDelete">Remove</button>
+        <button class="btn btn-primary" id="viewNoteEdit">Edit note</button>
+      </div>
+    </div>
   </div>
 </div>
 
-<!-- Floating preview (Open Graph) -->
-<div id="linkPreview" class="link-preview-popover hidden">
-  <div class="preview-loading" id="previewLoading">Loading preview…</div>
-  <div class="preview-body hidden" id="previewBody">
-    <img id="previewImage" class="preview-image hidden" alt="">
-    <p id="previewTitle" class="preview-title"></p>
-    <p id="previewDescription" class="preview-description"></p>
+<!-- Add / edit note -->
+<div id="editNoteOverlay" class="confirm-overlay hidden">
+  <div class="confirm-box modal-box note-view-box note-edit-box" role="dialog" aria-modal="true" aria-labelledby="editNoteTitle">
+    <div class="modal-box-header">
+      <h3 id="editNoteTitle">Add note</h3>
+      <button class="btn-icon-close" id="editNoteClose" aria-label="Close">✕</button>
+    </div>
+
+    <form id="noteForm" class="link-form" autocomplete="off">
+      <input type="hidden" id="editingId">
+
+      <div class="field">
+        <label for="inputTitle">Title</label>
+        <input type="text" id="inputTitle" name="title" placeholder="Note title" required>
+      </div>
+
+      <div class="field">
+        <label for="inputTags">Tags</label>
+        <input type="text" id="inputTags" name="tags" placeholder="work, reference, howto (comma-separated)">
+      </div>
+
+      <div class="field field-content">
+        <div class="field-content-label-row">
+          <label for="inputContent">Content</label>
+          <span class="field-content-hints">
+            <span class="content-drop-hint" title="Drag a .txt file onto the field below to load its contents">📄 Drop a .txt file to load it</span>
+            <span class="content-counter" id="contentCounter">0 characters</span>
+          </span>
+        </div>
+        <textarea id="inputContent" name="content" rows="14" placeholder="Write your note here, or drag a .txt file in… (Ctrl/Cmd+Enter to save)"></textarea>
+      </div>
+
+      <div class="field field-favorite">
+        <label class="checkbox-row" for="inputFavorite">
+          <input type="checkbox" id="inputFavorite" name="favorite">
+          <span>Mark as favorite</span>
+        </label>
+      </div>
+
+      <p class="form-error hidden" id="formError"></p>
+
+      <div class="confirm-actions">
+        <button type="button" class="btn btn-ghost btn-cancel-edit" id="btnCancelEdit">Cancel</button>
+        <button type="submit" class="btn btn-primary btn-add" id="btnSubmit">Save note</button>
+      </div>
+    </form>
   </div>
-  <div class="preview-empty hidden" id="previewEmpty">No preview available for this address.</div>
 </div>
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script type="module" src="app.js"></script>
+<script type="module" src="notes.js"></script>
 </body>
 </html>
