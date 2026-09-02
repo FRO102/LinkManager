@@ -1,6 +1,6 @@
 # Nodes — Link Manager
 
-A web app for managing a personal collection of links ("nodes"): add, edit, delete, search, filter, drag-to-reorder, import from other sources, check for broken links, and view statistics. A second page, **Notes**, offers the same interface for freeform documentation and notes — reachable from a nav button in the header of either page. Frontend in plain HTML5/CSS/JS, backend in Node.js + Express, data persisted in a SQLite database in a Docker volume with automatic backups.
+A web app for managing a personal collection of links ("nodes"): add, edit, delete, search, filter, drag-to-reorder, import from other sources, check for broken links, and view statistics. Two more pages, **Notes** (freeform documentation) and **Tasks** (a to-do list), offer the same look and feel — reachable from nav buttons in the header of any page. Frontend in plain HTML5/CSS/JS, backend in Node.js + Express, data persisted in a SQLite database in a Docker volume with automatic backups.
 
 > **Upgrading from an older version?** If you have an existing `data/links.json` from before this app used SQLite, no action is needed — the server automatically imports it into a new `links.db` the first time it starts up, and renames the old file to `links.json.bak` (kept, not deleted) once the import succeeds. See [Data storage and backups](#data-storage-and-backups) below for details.
 
@@ -109,6 +109,16 @@ Notes live in their own tables (`notes`, `note_tags_catalog`, `note_tags`) in th
 
 Clicking a note (rather than its edit icon) opens a larger reading view with the full content, tags, and both created/last-edited dates. It supports keyboard navigation (←/→ or ↑/↓) between notes in the current filtered/sorted list, and stays in sync if the note is changed or removed elsewhere while it's open. From there, **Export .txt** downloads that single note as a plain-text file (title, tags, dates, then the content) — generated entirely client-side from data already loaded in the modal, no server round-trip needed. This is separate from the collection-wide **Export .json** in the header, which is meant for backup/re-import rather than reading outside the app.
 
+## Tasks page
+
+A third page (`tasks.html`) is a to-do list, in the same look and layout as links and notes: a title, an optional description, and an optional due date. Reach it via the **Tasks →** button from either other page.
+
+Simpler than notes by design — no tags, no drag-and-drop manual ordering, and no separate reading view (a task's content is short enough that clicking it goes straight to the same add/edit modal used for creating one, pre-filled). Tasks sort automatically by due date (soonest first, undated tasks last) rather than a manual order, since there's no drag-and-drop UI for it here.
+
+**Completed tasks are hidden by default** — checking a task's checkbox marks it done and it drops out of the list immediately, keeping the view focused on what's outstanding. Toggle **Show completed** in the toolbar to bring them back, or **Overdue only** to see just what's incomplete and past its due date (the two are mutually exclusive). **Clear completed** in the Actions menu removes every completed task in one step. Unlike notes/links tag filtering, both of these filters are applied server-side (`GET /api/tasks?completed=` / `?overdue=`) rather than client-side, so a large backlog of completed tasks doesn't need to be fetched at all when they're hidden.
+
+What's the same as links/notes: search, sorting (due date / recently added / title), the add/edit modal with unsaved-changes protection, JSON import/export, bulk delete via the API, and statistics (now including an overdue count). Tasks live in their own table (`tasks`) in the same `links.db` file, fully independent of links and notes — nothing you do on one page affects the others.
+
 ## Configuration
 
 Environment variables (already set in `docker-compose.yml`, some commented out since they're optional):
@@ -119,7 +129,7 @@ Environment variables (already set in `docker-compose.yml`, some commented out s
 | `DATA_DIR`                    | ./data  | Folder where `links.db` and `backups/` are stored    |
 | `BACKUP_RETENTION`             | 14      | Number of daily backups to keep before rotating        |
 | `LINK_CHECK_INTERVAL_HOURS`    | 24      | How often automatic dead link checking runs            |
-| `IMPORT_MAX_ITEMS`             | 5000    | Max links or notes accepted in a single import call     |
+| `IMPORT_MAX_ITEMS`             | 5000    | Max links, notes, or tasks accepted in a single import call     |
 | `AUTH_TOKEN`                   | (unset) | If set, every `/api` request must send it in the `X-Auth-Token` header. Leave unset for local/trusted-network use — `/api/health` always stays open so the Docker healthcheck keeps working |
 
 To change the external port, edit `docker-compose.yml`:
@@ -136,9 +146,10 @@ link-manager/
 ├── server.js            # Entry point: wires up middleware, routers, startup
 ├── lib/                  # Framework-agnostic modules (no Express dependency except where noted)
 │   ├── config.js         # Env vars and derived constants
-│   ├── db.js              # SQLite connection, schema (links + notes), one-time links.json migration
+│   ├── db.js              # SQLite connection, schema (links + notes + tasks), one-time links.json migration
 │   ├── persistence.js    # readLinks/writeLinks (array-based compatibility layer) + direct SQL helpers
 │   ├── notes-persistence.js # Same pattern as persistence.js, for the notes tables
+│   ├── tasks-persistence.js # Same pattern, for the tasks table (simpler — no tags)
 │   ├── ssrf-guard.js      # assertSafeToFetch — blocks requests to private/reserved IPs
 │   ├── link-check.js      # checkLinkStatus, checkAllLinks, cancellation
 │   ├── og-preview.js       # Open Graph scraping with an in-memory cache
@@ -152,7 +163,10 @@ link-manager/
 │   ├── misc.js              # duplicates, export, tags, stats, health, preview (links)
 │   ├── notes.js             # CRUD, reorder, bulk ops (notes)
 │   ├── notes-import.js       # JSON import (notes)
-│   └── notes-misc.js         # export, tags, stats (notes)
+│   ├── notes-misc.js         # export, tags, stats (notes)
+│   ├── tasks.js              # CRUD, bulk-delete, completed/overdue/search filters (tasks)
+│   ├── tasks-import.js        # JSON import (tasks)
+│   └── tasks-misc.js          # export, stats (tasks)
 ├── package.json
 ├── Dockerfile             # Multi-stage: compiles better-sqlite3 in a builder stage
 ├── docker-compose.yml
@@ -160,7 +174,7 @@ link-manager/
 ├── .env.example          # Template for running outside Docker with custom settings
 ├── .github/workflows/ci.yml  # Runs the test suite + a Docker build on every push/PR
 ├── data/
-│   ├── links.db           # SQLite database (main persistence file, both links and notes)
+│   ├── links.db           # SQLite database (main persistence file — links, notes, and tasks)
 │   └── backups/            # Rotating automatic backups (links-<timestamp>.db)
 ├── test/                  # Automated tests (node:test, no extra dependencies)
 │   ├── helpers.js
@@ -172,18 +186,22 @@ link-manager/
 │   ├── concurrency.test.js
 │   ├── startup.test.js
 │   ├── sqlite-migration.test.js
-│   └── notes.test.js       # CRUD, bulk, filters, import, and links/notes isolation
+│   ├── notes.test.js       # CRUD, bulk, filters, import, and links/notes isolation
+│   └── tasks.test.js       # CRUD, due-date ordering, completed/overdue filters, import, isolation
 └── public/                # Static frontend
     ├── index.html          # Links page ("Nodes")
     ├── notes.html           # Notes page — no sidebar composer; add/edit happens in a modal
-    ├── style.css           # Shared by both pages
+    ├── tasks.html            # Tasks page — same modal pattern, no reading view
+    ├── style.css           # Shared by all three pages
     ├── app.js              # Links page core: shared state, rendering, event wiring
     ├── notes.js             # Notes page core — mirrors app.js minus URL/link-check/preview
+    ├── tasks.js              # Tasks page core — simpler still: no tags, no drag-and-drop
     └── js/
-        ├── utils.js         # Pure helpers (escapeHtml, formatDate, etc.) — shared by both pages
-        ├── focus-trap.js      # Modal accessibility (Tab-cycling) — shared by both pages
+        ├── utils.js         # Pure helpers (escapeHtml, formatDate, etc.) — shared by all pages
+        ├── focus-trap.js      # Modal accessibility (Tab-cycling) — shared by all pages
         ├── api.js            # fetch() wrappers for /api/links endpoints
-        └── notes-api.js       # fetch() wrappers for /api/notes endpoints
+        ├── notes-api.js       # fetch() wrappers for /api/notes endpoints
+        └── tasks-api.js        # fetch() wrappers for /api/tasks endpoints
 ```
 
 ## REST API
@@ -232,11 +250,27 @@ Same shape as links, minus anything URL-specific (no duplicate-check, no per-ite
 | GET    | `/api/notes/stats`                 | Collection statistics (total, favorites, totalTags — no link health) |
 | GET    | `/api/notes/tags`                  | List all note tags in use                                     |
 
+### Tasks
+
+Simpler still — no tags, no reorder (tasks sort by due date automatically):
+
+| Method | Route                              | Description                                             |
+|--------|-------------------------------------|-----------------------------------------------------------|
+| GET    | `/api/tasks`                       | List tasks. Filters: `?q=`, `?completed=true\|all` (incomplete only by default), `?overdue=true` (incomplete and past due). Same `?limit=&offset=` pagination as links/notes |
+| GET    | `/api/tasks/:id`                   | Get a single task                                            |
+| POST   | `/api/tasks`                       | Create a task (`{title, description, dueDate, completed}`) — `dueDate` must be `YYYY-MM-DD` or omitted |
+| PUT    | `/api/tasks/:id`                   | Edit a task, including toggling `completed`                  |
+| DELETE | `/api/tasks/:id`                   | Delete a task                                                |
+| POST   | `/api/tasks/bulk-delete`           | Delete several tasks at once (used by "Clear completed" in the UI) |
+| POST   | `/api/tasks/import/json`           | Import tasks from JSON, capped at `IMPORT_MAX_ITEMS` — an item is skipped if its title, description, and due date exactly match an existing task |
+| GET    | `/api/tasks/export`                | Download the full tasks collection as `tasks.json`             |
+| GET    | `/api/tasks/stats`                 | Collection statistics: total, completed, outstanding, overdue  |
+
 ### Shared
 
 | Method | Route                              | Description                                             |
 |--------|-------------------------------------|-----------------------------------------------------------|
-| GET    | `/api/backups`                     | List available backups (cover both links and notes — one database) |
+| GET    | `/api/backups`                     | List available backups (cover links, notes, and tasks — one database) |
 | POST   | `/api/backups`                     | Create an immediate backup                                   |
 | POST   | `/api/backups/:file/restore`       | Restore a specific backup                                     |
 | GET    | `/api/health`                      | Health check (always accessible, even with `AUTH_TOKEN` set) |
@@ -245,17 +279,17 @@ If `AUTH_TOKEN` is set, every route above except `/api/health` requires an `X-Au
 
 ## Data storage and backups
 
-Links and notes are stored in the same SQLite database at `data/links.db`, in separate sets of tables: `links` + `tags` + `link_tags` for links, and `notes` + `note_tags_catalog` + `note_tags` for notes (tags are normalized rather than packed into a JSON column, which is what makes tag filtering and the `bulk-tag` endpoints cheap on both sides). The database runs in WAL mode, so alongside `links.db` you'll also see `links.db-wal` and `links.db-shm` — these are normal SQLite working files, not separate data to back up individually.
+Links, notes, and tasks are stored in the same SQLite database at `data/links.db`, in separate sets of tables: `links` + `tags` + `link_tags` for links, `notes` + `note_tags_catalog` + `note_tags` for notes (tags are normalized rather than packed into a JSON column, which is what makes tag filtering and the `bulk-tag` endpoints cheap on both sides), and a single `tasks` table (no tags to normalize). The database runs in WAL mode, so alongside `links.db` you'll also see `links.db-wal` and `links.db-shm` — these are normal SQLite working files, not separate data to back up individually.
 
-**Automatic backups** run daily (and once at startup) into `data/backups/`, each one a self-contained, compacted snapshot of the *whole database* (links and notes together) taken with SQLite's `VACUUM INTO` — safe to take against the live database, and safe to copy elsewhere on its own (a single `.db` file, no companion `-wal`/`-shm` needed). The last 14 are kept by default (`BACKUP_RETENTION`). You can also trigger one immediately (`POST /api/backups`) or restore an earlier one (`POST /api/backups/:file/restore`) — restoring always takes a fresh backup of the current state first, as a safety net, and restores both links and notes together since they live in the same file.
+**Automatic backups** run daily (and once at startup) into `data/backups/`, each one a self-contained, compacted snapshot of the *whole database* (links, notes, and tasks together) taken with SQLite's `VACUUM INTO` — safe to take against the live database, and safe to copy elsewhere on its own (a single `.db` file, no companion `-wal`/`-shm` needed). The last 14 are kept by default (`BACKUP_RETENTION`). You can also trigger one immediately (`POST /api/backups`) or restore an earlier one (`POST /api/backups/:file/restore`) — restoring always takes a fresh backup of the current state first, as a safety net, and restores links, notes, and tasks together since they live in the same file.
 
-You can also use the **Export .json** button in either page's UI, or `GET /api/export` / `GET /api/notes/export`, at any time to download that page's collection as plain JSON — handy for moving data into another tool, or as a human-readable backup alongside the `.db` snapshots. Links and notes are exported and imported independently of each other.
+You can also use the **Export .json** button in any page's UI, or `GET /api/export` / `GET /api/notes/export` / `GET /api/tasks/export`, at any time to download that page's collection as plain JSON — handy for moving data into another tool, or as a human-readable backup alongside the `.db` snapshots. Links, notes, and tasks are exported and imported independently of each other.
 
-**Migrating from a pre-SQLite install:** if `data/links.json` exists and `data/links.db` doesn't yet, the server imports it automatically the first time it starts — logging what it did — and renames the old file to `links.json.bak` once the import succeeds (kept for reference, never deleted automatically). If the database already has data, the old JSON file is set aside the same way without re-importing, so this only ever runs once. This migration only applies to links — notes are a newer addition with no pre-SQLite format to migrate from.
+**Migrating from a pre-SQLite install:** if `data/links.json` exists and `data/links.db` doesn't yet, the server imports it automatically the first time it starts — logging what it did — and renames the old file to `links.json.bak` once the import succeeds (kept for reference, never deleted automatically). If the database already has data, the old JSON file is set aside the same way without re-importing, so this only ever runs once. This migration only applies to links — notes and tasks are newer additions with no pre-SQLite format to migrate from.
 
 ## Testing
 
-The project ships with an automated test suite (Node's built-in `node:test`, no extra dependencies) covering CRUD, duplicate detection, imports, bulk operations, server-side pagination/filtering, startup behavior, the SQLite migration path, backup/restore, the notes CRUD/import/bulk/filtering behavior, links/notes isolation, and the security hardening below (SSRF protection, rate limiting, optional auth, path traversal, concurrent-write safety).
+The project ships with an automated test suite (Node's built-in `node:test`, no extra dependencies) covering CRUD, duplicate detection, imports, bulk operations, server-side pagination/filtering, startup behavior, the SQLite migration path, backup/restore, notes CRUD/import/bulk/filtering, tasks CRUD/due-date ordering/completed-overdue filtering/import, cross-page isolation, and the security hardening below (SSRF protection, rate limiting, optional auth, path traversal, concurrent-write safety).
 
 ```bash
 npm test

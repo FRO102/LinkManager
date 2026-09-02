@@ -222,4 +222,28 @@ describe('SQLite-backed backup and restore', () => {
     const backups = listBackups();
     assert.equal(backups.length, 1, 'a backup should have been created for the notes-only collection');
   });
+
+  // Same regression, extended to tasks: createBackup() must check every
+  // table, not just links and notes.
+  test('createBackup still backs up a collection that has tasks but no links or notes', () => {
+    freshDataDir();
+    resetAppModules();
+    const { insertTask } = require('../lib/tasks-persistence');
+    const { createBackup, listBackups } = require('../lib/backups');
+
+    insertTask({
+      id: 'task-only',
+      title: 'Important task',
+      description: '',
+      dueDate: null,
+      completed: false,
+      order: 0,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+
+    createBackup();
+    const backups = listBackups();
+    assert.equal(backups.length, 1, 'a backup should have been created for the tasks-only collection');
+  });
 });

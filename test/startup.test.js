@@ -47,12 +47,12 @@ test('server starts cleanly against a DATA_DIR that does not exist yet', async (
   assert.equal(fs.existsSync(path.join(freshDataDir, 'links.db')), true, 'links.db should have been created');
   assert.equal(fs.existsSync(path.join(freshDataDir, 'backups')), true, 'backups/ should have been created');
 
-  // Confirms the notes schema is created in the same pass as the links
-  // schema — both live in lib/db.js's single db.exec(...) call, so a
-  // regression here would mean the two are somehow out of sync.
+  // Confirms the notes and tasks schemas are created in the same pass as
+  // the links schema — all three live in lib/db.js's single db.exec(...)
+  // call, so a regression here would mean they're somehow out of sync.
   const db = require('../lib/db');
   const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map(t => t.name);
-  ['links', 'tags', 'link_tags', 'notes', 'note_tags_catalog', 'note_tags'].forEach((table) => {
+  ['links', 'tags', 'link_tags', 'notes', 'note_tags_catalog', 'note_tags', 'tasks'].forEach((table) => {
     assert.ok(tables.includes(table), `expected table "${table}" to exist after a fresh startup`);
   });
 });

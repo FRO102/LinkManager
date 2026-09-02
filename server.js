@@ -15,6 +15,9 @@ const miscRouter = require('./routes/misc');
 const notesRouter = require('./routes/notes');
 const notesImportRouter = require('./routes/notes-import');
 const notesMiscRouter = require('./routes/notes-misc');
+const tasksRouter = require('./routes/tasks');
+const tasksImportRouter = require('./routes/tasks-import');
+const tasksMiscRouter = require('./routes/tasks-misc');
 
 const app = express();
 app.set('trust proxy', true);
@@ -70,6 +73,12 @@ app.use('/api', miscRouter);
 app.use('/api/notes/import', notesImportRouter);
 app.use('/api/notes', notesMiscRouter);
 app.use('/api/notes', notesRouter);
+
+// Tasks mirror the same setup, on their own /api/tasks prefix — same
+// fixed-segment-before-:id ordering rationale as notes above.
+app.use('/api/tasks/import', tasksImportRouter);
+app.use('/api/tasks', tasksMiscRouter);
+app.use('/api/tasks', tasksRouter);
 
 // Only actually start listening (and the background timers) when this file is
 // run directly — e.g. `node server.js`. When it's require()'d instead (as the
