@@ -243,8 +243,4 @@ Tests are isolated; each file spins up the app on an ephemeral port with a tempo
 - **Node Version Errors**: If `npm start` fails or environment variables aren't loading, verify you are using Node 20.6+.
 - **Docker Permission Denied**: On Linux, if you cannot run docker commands without `sudo`, run: `sudo usermod -aG docker $USER` and restart your session.
 
----
 
-## 📄 License
-
-This project is licensed under the **MIT License**. See the LICENSE file for details.
