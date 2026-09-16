@@ -886,11 +886,6 @@ button, input, textarea, select{
   color: var(--ink);
   text-decoration: none;
   line-height: 1.3;
-  background: transparent;
-  border: none;
-  padding: 0;
-  cursor: pointer;
-  text-align: left;
 }
 .link-title:hover{ color: var(--indigo); }
 
