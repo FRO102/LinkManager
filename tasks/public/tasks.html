@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tasks — Link Manager</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="grid-backdrop" aria-hidden="true"></div>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-mark">☑</span>
+    <div class="brand-text">
+      <h1>Tasks</h1>
+      <p class="brand-sub">to-do list</p>
+    </div>
+  </div>
+
+  <div class="file-controls">
+    <span class="file-status" id="fileStatus" data-state="connected">
+      <span class="status-dot"></span>
+      <span class="status-label">Connected to server</span>
+    </span>
+    <div class="file-buttons">
+      <a class="btn btn-ghost" href="index.html" title="Go to Nodes (links)">← Nodes</a>
+      <a class="btn btn-ghost" href="notes.html" title="Go to Notes">Notes</a>
+      <div class="overflow-menu-wrap">
+        <button class="btn btn-ghost" id="btnMoreMenu" aria-haspopup="true" aria-expanded="false" title="More actions">
+          Actions
+          <svg width="10" height="6" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M1 1L5 5L9 1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+        </button>
+        <div class="overflow-menu hidden" id="moreMenu" role="menu">
+          <button class="overflow-menu-item" id="btnStats" role="menuitem" title="View task statistics">Statistics</button>
+          <button class="overflow-menu-item" id="btnImport" role="menuitem" title="Import tasks.json">Import</button>
+          <button class="overflow-menu-item" id="btnExport" role="menuitem" title="Download a copy as tasks.json">Export .json</button>
+          <button class="overflow-menu-item" id="btnClearCompleted" role="menuitem" title="Remove all completed tasks">Clear completed</button>
+        </div>
+      </div>
+      <button class="btn btn-ghost" id="btnToggleTheme" title="Toggle theme">🌗</button>
+      <button class="btn btn-primary" id="btnAddTask" title="Add a new task">+ Add task</button>
+    </div>
+  </div>
+</header>
+
+<main class="layout layout-full-width">
+
+  <section class="collection" aria-labelledby="collectionTitle">
+    <div class="collection-header">
+      <h2 id="collectionTitle" class="section-eyebrow">Collection</h2>
+
+      <div class="toolbar">
+        <div class="toolbar-row toolbar-row-search">
+          <input type="search" id="searchInput" class="search-input" placeholder="Search title or description…">
+        </div>
+
+        <div class="toolbar-row toolbar-row-filters">
+          <div class="toolbar-row-controls">
+            <label class="checkbox-row task-show-completed" for="showCompleted">
+              <input type="checkbox" id="showCompleted">
+              <span>Show completed</span>
+            </label>
+
+            <label class="checkbox-row task-show-overdue" for="showOverdueOnly">
+              <input type="checkbox" id="showOverdueOnly">
+              <span>Overdue only</span>
+            </label>
+
+            <div class="sort-control">
+              <label for="sortSelect">Sort</label>
+              <select id="sortSelect">
+                <option value="due">Due date</option>
+                <option value="recent">Recently added</option>
+                <option value="az">Title A–Z</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="active-filters-bar hidden" id="activeFiltersBar">
+        <span class="active-filters-label" id="activeFiltersLabel"></span>
+        <button type="button" class="clear-filters-btn" id="btnClearFilters">Clear all filters</button>
+      </div>
+    </div>
+
+    <p class="count-line" id="countLine" aria-live="polite">0 tasks</p>
+
+    <ul class="link-list" id="linkList"></ul>
+
+    <div class="empty-state" id="emptyState">
+      <span class="empty-mark">◇</span>
+      <p>No tasks yet.</p>
+      <p class="empty-sub">Click "+ Add task" above to add your first one.</p>
+    </div>
+  </section>
+
+</main>
+
+<footer class="footbar">
+  <p><span id="footerCount">0</span> tasks · persisted on the server in <code>data/links.db</code></p>
+</footer>
+
+<!-- Delete confirmation -->
+<div id="confirmOverlay" class="confirm-overlay hidden">
+  <div class="confirm-box" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle">
+    <h3 id="confirmTitle">Remove task?</h3>
+    <p id="confirmText"></p>
+    <div class="confirm-actions">
+      <button class="btn btn-ghost" id="confirmCancel">Cancel</button>
+      <button class="btn btn-danger" id="confirmDelete">Remove</button>
+    </div>
+  </div>
+</div>
+
+<!-- Import modal -->
+<div id="importOverlay" class="confirm-overlay hidden">
+  <div class="confirm-box modal-box" role="dialog" aria-modal="true" aria-labelledby="importTitle">
+    <div class="modal-box-header">
+      <h3 id="importTitle">Import tasks</h3>
+      <button class="btn-icon-close" id="importClose" aria-label="Close">✕</button>
+    </div>
+
+    <div class="import-panel" id="panelJson">
+      <p class="import-hint">Upload a <code>tasks.json</code> file exported from this app (or another instance).</p>
+      <input type="file" id="fileJson" accept=".json">
+    </div>
+
+    <p class="form-error hidden" id="importError"></p>
+    <p class="import-result hidden" id="importResult"></p>
+
+    <div class="confirm-actions">
+      <button class="btn btn-ghost" id="importCancel">Cancel</button>
+      <button class="btn btn-primary" id="importSubmit">Import</button>
+    </div>
+  </div>
+</div>
+
+<!-- Statistics modal -->
+<div id="statsOverlay" class="confirm-overlay hidden">
+  <div class="confirm-box modal-box stats-box" role="dialog" aria-modal="true" aria-labelledby="statsTitle">
+    <div class="modal-box-header">
+      <h3 id="statsTitle">Task statistics</h3>
+      <button class="btn-icon-close" id="statsClose" aria-label="Close">✕</button>
+    </div>
+    <div id="statsContent" class="stats-content">
+      <p class="import-hint">Loading…</p>
+    </div>
+  </div>
+</div>
+
+<!-- Add / edit task -->
+<div id="editTaskOverlay" class="confirm-overlay hidden">
+  <div class="confirm-box modal-box" role="dialog" aria-modal="true" aria-labelledby="editTaskTitle">
+    <div class="modal-box-header">
+      <h3 id="editTaskTitle">Add task</h3>
+      <button class="btn-icon-close" id="editTaskClose" aria-label="Close">✕</button>
+    </div>
+
+    <form id="taskForm" class="link-form" autocomplete="off">
+      <input type="hidden" id="editingId">
+
+      <div class="field">
+        <label for="inputTitle">Title</label>
+        <input type="text" id="inputTitle" name="title" placeholder="Task title" required>
+      </div>
+
+      <div class="field">
+        <label for="inputDueDate">Due date</label>
+        <input type="date" id="inputDueDate" name="dueDate">
+      </div>
+
+      <div class="field field-notes">
+        <label for="inputDescription">Description</label>
+        <textarea id="inputDescription" name="description" rows="4" placeholder="Optional details…"></textarea>
+      </div>
+
+      <div class="field field-favorite">
+        <label class="checkbox-row" for="inputCompleted">
+          <input type="checkbox" id="inputCompleted">
+          <span>Completed</span>
+        </label>
+      </div>
+
+      <p class="form-error hidden" id="formError"></p>
+
+      <div class="confirm-actions">
+        <button type="button" class="btn btn-ghost btn-cancel-edit" id="btnCancelEdit">Cancel</button>
+        <button type="submit" class="btn btn-primary btn-add" id="btnSubmit">Save task</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script type="module" src="tasks.js"></script>
+</body>
+</html>

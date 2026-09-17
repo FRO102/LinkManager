@@ -1,0 +1,10 @@
+node_modules/
+**/*.db
+**/*.db-wal
+**/*.db-shm
+data/*.json
+data/*.json.bak
+data/backups/
+!data/.gitkeep
+.env
+publish.sh

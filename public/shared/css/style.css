@@ -1,0 +1,1800 @@
+/* ============================================================
+   Nodes — Link Manager
+   Palette: technical paper / indigo ink / copper
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap');
+
+:root{
+  --paper:        #EDEAE2;
+  --paper-raised: #F7F5EF;
+  --ink:          #1F2421;
+  --ink-soft:     #565F5A;
+  --line:         #C9C3B3;
+  --indigo:       #2F3E63;
+  --indigo-soft:  #5A6B96;
+  --copper:       #9C4E20;
+  --copper-soft:  #E4B48C;
+  --good:         #3E6B4F;
+  --danger:       #A8402C;
+  --danger-tint:  #F3E2DD;
+
+  --font-display: 'Fraunces', serif;
+  --font-mono:    'JetBrains Mono', monospace;
+  --font-body:    'Inter', sans-serif;
+
+  --radius: 3px;
+}
+
+body[data-theme="dark"] {
+  --paper:        #1F2421;
+  --paper-raised: #2a302d;
+  --ink:          #EDEAE2;
+  --ink-soft:     #C9C3B3;
+  --line:         #444;
+  --indigo:       #8a99c4;
+  --indigo-soft:  #5a6b96;
+  --copper:       #f0a423;
+  --copper-soft:  #b5642e;
+  --good:         #5c9e74;
+  --danger:       #d9705a;
+  --danger-tint:  #3a2a26;
+}
+
+*{ box-sizing: border-box; }
+
+html, body{
+  margin: 0;
+  padding: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  min-height: 100vh;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+::selection{ background: var(--copper-soft); color: var(--ink); }
+
+.grid-backdrop{
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: radial-gradient(circle, rgba(47,62,99,0.14) 1px, transparent 1px);
+  background-size: 26px 26px;
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black 40%, transparent 100%);
+}
+
+button, input, textarea, select{
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+
+.hidden{ display: none !important; }
+
+/* ---------- Topbar ---------- */
+
+.topbar{
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+  padding: 28px clamp(20px, 4vw, 56px) 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.brand{
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.brand-mark{
+  font-size: 28px;
+  line-height: 1;
+  color: var(--copper);
+  transform: translateY(2px);
+}
+
+.brand-text h1{
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 34px;
+  letter-spacing: -0.01em;
+  margin: 0;
+  line-height: 1;
+}
+
+.brand-sub{
+  margin: 6px 0 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.file-controls{
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.file-status{
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.status-dot{
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ink-soft);
+  opacity: 0.5;
+}
+
+.file-status[data-state="connected"] .status-dot{
+  background: var(--good);
+  opacity: 1;
+  box-shadow: 0 0 0 3px rgba(62,107,79,0.15);
+}
+
+.file-status[data-state="dirty"] .status-dot{
+  background: var(--copper);
+  opacity: 1;
+  box-shadow: 0 0 0 3px rgba(181,100,46,0.18);
+}
+
+.file-status[data-state="error"] .status-dot{
+  background: var(--danger);
+  opacity: 1;
+  box-shadow: 0 0 0 3px rgba(168,64,44,0.18);
+}
+
+.file-buttons{
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  position: relative;
+}
+
+/* ---------- Overflow "More actions" menu ---------- */
+
+.overflow-menu-wrap{
+  position: relative;
+}
+
+#btnMoreMenu{
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+#btnMoreMenu svg{
+  transition: transform 0.15s ease;
+}
+#btnMoreMenu[aria-expanded="true"] svg{
+  transform: rotate(180deg);
+}
+
+.overflow-menu{
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 180px;
+  background: var(--paper-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: 0 12px 32px -8px rgba(0,0,0,0.28);
+  padding: 6px;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  animation: menu-in 0.14s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes menu-in{
+  from{ opacity: 0; transform: translateY(-4px); }
+  to{ opacity: 1; transform: translateY(0); }
+}
+
+.overflow-menu-item{
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  padding: 9px 12px;
+  border-radius: calc(var(--radius) - 1px);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.1s ease;
+}
+.overflow-menu-item:hover{
+  background: var(--paper);
+}
+
+/* ---------- Buttons ---------- */
+
+.btn{
+  appearance: none;
+  border: 1px solid var(--ink);
+  background: transparent;
+  color: var(--ink);
+  padding: 9px 16px;
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: transform 0.12s ease, background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+  /* .btn is also used on <a> elements (e.g. the Nodes <-> Notes nav link) —
+     these two properties make a link render and behave like the buttons
+     it sits next to, instead of inheriting default inline anchor styling. */
+  display: inline-block;
+  text-decoration: none;
+}
+
+.btn:hover{ transform: translateY(-1px); }
+.btn:active{ transform: translateY(0); }
+.btn:focus-visible{
+  outline: 2px solid var(--indigo);
+  outline-offset: 2px;
+}
+.btn:disabled{
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-ghost{
+  border-color: var(--line);
+  color: var(--ink-soft);
+  background: var(--paper-raised);
+}
+.btn-ghost:hover{
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+.btn-primary{
+  background: var(--indigo);
+  border-color: var(--indigo);
+  color: #F7F5EF;
+}
+.btn-primary:hover{
+  background: #263352;
+  border-color: #263352;
+}
+
+.btn-danger{
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #F7F5EF;
+}
+.btn-danger:hover{
+  background: #8f3625;
+  border-color: #8f3625;
+}
+
+.btn-add{ width: 100%; margin-top: 4px; }
+
+.btn-cancel-edit{
+  width: 100%;
+  margin-top: 8px;
+}
+
+/* ---------- Layout ---------- */
+
+.layout{
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 0;
+  align-items: start;
+}
+
+/* Used by the notes page, which has no sidebar composer (writing happens in
+   a modal instead, opened via the "+ Add note" header button) — the
+   collection section just takes the full width. */
+.layout-full-width{
+  grid-template-columns: 1fr;
+}
+
+@media (max-width: 860px){
+  .layout{ grid-template-columns: 1fr; }
+}
+
+.section-eyebrow{
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--indigo);
+  margin: 0 0 18px;
+}
+
+/* ---------- Composer (left) ---------- */
+
+.composer{
+  padding: 32px clamp(20px, 3vw, 40px);
+  border-right: 1px solid var(--line);
+  position: sticky;
+  top: 0;
+  align-self: start;
+}
+
+.composer-panel-header{
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.composer-close{
+  font-size: 16px;
+}
+
+.composer-overlay{
+  display: none;
+}
+
+.fab{
+  display: none;
+}
+
+@media (max-width: 860px){
+  .composer{
+    border-right: none;
+    border-bottom: none;
+    position: fixed;
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    max-height: 88vh;
+    overflow-y: auto;
+    background: var(--paper-raised);
+    border-top-left-radius: 18px;
+    border-top-right-radius: 18px;
+    box-shadow: 0 -16px 48px -12px rgba(0,0,0,0.35);
+    z-index: 121;
+    transform: translateY(110%);
+    transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+    padding: 20px 20px calc(24px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .composer.is-open{
+    transform: translateY(0);
+  }
+
+  .composer-panel-header{
+    display: flex;
+  }
+
+  .composer-overlay{
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(20, 23, 31, 0.45);
+    z-index: 120;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+  }
+  .composer-overlay.is-visible{
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .fab{
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: fixed;
+    right: 20px;
+    bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+    width: 54px;
+    height: 54px;
+    border-radius: 50%;
+    background: var(--indigo);
+    color: #F7F5EF;
+    border: none;
+    box-shadow: 0 10px 28px -6px rgba(47,62,99,0.55);
+    cursor: pointer;
+    z-index: 55;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .fab:hover{
+    transform: scale(1.06);
+  }
+  .fab:active{
+    transform: scale(0.96);
+  }
+  .fab.is-hidden{
+    transform: scale(0);
+    opacity: 0;
+    pointer-events: none;
+  }
+}
+
+.link-form{
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.field{
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field label{
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
+}
+
+.field input[type="text"],
+.field input[type="url"],
+.field textarea{
+  background: var(--paper-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  font-size: 14px;
+  color: var(--ink);
+  transition: border-color 0.12s ease;
+}
+
+.field input:focus,
+.field textarea:focus{
+  outline: none;
+  border-color: var(--indigo-soft);
+}
+
+.field textarea{ resize: vertical; min-height: 44px; }
+
+/* The notes page's content textarea (rows="14") is a small editor rather
+   than a short optional-context field like links' field-notes — give it
+   more room and a monospace-friendly line height without touching the
+   shared .field/.field textarea rules other pages rely on. */
+.field-content textarea{
+  min-height: 480px;
+  line-height: 1.5;
+  /* auto-resize (grown via JS by setting an inline height) still respects
+     manual resize, but starts from this min-height rather than the ~44px
+     default used elsewhere. */
+  overflow-y: hidden;
+}
+
+/* Shown while dragging a text file over the content textarea, so the drop
+   target is obvious before the user releases the file. */
+.field-content textarea.is-drop-target{
+  border-color: var(--indigo);
+  border-style: dashed;
+  background: var(--paper);
+  box-shadow: 0 0 0 3px var(--indigo-soft, rgba(90,107,150,0.25));
+}
+
+.field-content-label-row{
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.field-content-hints{
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.content-drop-hint{
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink-soft);
+  white-space: nowrap;
+  opacity: 0.75;
+}
+
+.content-counter{
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+.content-counter.is-near-limit{ color: var(--copper); }
+
+@media (max-width: 480px){
+  /* Not enough room for both hints on very narrow screens — the textarea's
+     placeholder still mentions drag-and-drop, so this is a nice-to-have
+     that can drop off rather than crowding the character counter. */
+  .content-drop-hint{ display: none; }
+}
+
+.checkbox-row{
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.checkbox-row input{ width: 15px; height: 15px; accent-color: var(--copper); }
+
+.form-error{
+  background: var(--danger-tint);
+  color: var(--danger);
+  border-radius: var(--radius);
+  padding: 9px 12px;
+  font-size: 12.5px;
+  margin: 0;
+}
+
+/* ---------- Collection (right) ---------- */
+
+.collection{
+  padding: 32px clamp(20px, 3vw, 40px) 60px;
+  min-width: 0;
+}
+
+.collection-header{
+  margin-bottom: 6px;
+}
+
+.toolbar{
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.toolbar-row{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.toolbar-row-filters{
+  justify-content: space-between;
+}
+
+.toolbar-row-controls{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-left: auto;
+}
+
+.search-input{
+  flex: 1 1 220px;
+  width: 100%;
+  background: var(--paper-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 9px 12px;
+  font-size: 13px;
+}
+.search-input:focus{
+  outline: none;
+  border-color: var(--indigo-soft);
+}
+
+.filter-tags{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.view-density-group{
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.toggle-btn{
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.toggle-btn.is-active-toggle{
+  background: var(--indigo);
+  border-color: var(--indigo);
+  color: #F7F5EF;
+}
+.toggle-btn.is-active-toggle:hover{
+  background: #263352;
+  border-color: #263352;
+  color: #F7F5EF;
+}
+
+.tag-chip{
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--paper-raised);
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+.tag-chip:hover{ border-color: var(--indigo-soft); color: var(--ink); }
+.tag-chip.active{
+  background: var(--indigo);
+  border-color: var(--indigo);
+  color: #F7F5EF;
+}
+
+.tag-count{
+  font-size: 9.5px;
+  opacity: 0.7;
+  background: rgba(0,0,0,0.08);
+  border-radius: 999px;
+  padding: 1px 5px;
+  line-height: 1.4;
+}
+.tag-chip.active .tag-count{
+  background: rgba(255,255,255,0.2);
+}
+
+/* ---------- "N more" tags popover ---------- */
+
+.tag-more-wrap{
+  position: relative;
+  display: inline-flex;
+}
+
+.tag-more-btn{
+  font-style: normal;
+  border-style: dashed;
+  color: var(--indigo);
+  border-color: var(--indigo-soft);
+}
+.tag-more-btn:hover{
+  border-style: solid;
+  background: var(--indigo);
+  color: #F7F5EF;
+}
+.tag-more-btn[aria-expanded="true"]{
+  background: var(--indigo);
+  border-style: solid;
+  color: #F7F5EF;
+}
+
+.tag-popover{
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 45;
+  width: min(320px, 80vw);
+  background: var(--paper-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: 0 16px 40px -10px rgba(0,0,0,0.3);
+  padding: 10px;
+  animation: menu-in 0.14s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.tag-popover-search-wrap{
+  margin-bottom: 8px;
+}
+
+.tag-popover-search{
+  width: 100%;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 7px 10px;
+  font-size: 12.5px;
+  font-family: inherit;
+  color: var(--ink);
+}
+.tag-popover-search:focus{
+  outline: none;
+  border-color: var(--indigo-soft);
+}
+
+.tag-popover-list{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.tag-popover-empty{
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  margin: 4px 2px;
+}
+
+.tag-mode-btn,
+.tag-clear-btn{
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px dashed var(--line);
+  background: transparent;
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+.tag-mode-btn{
+  border-style: solid;
+  border-color: var(--copper-soft);
+  color: var(--copper);
+}
+.tag-mode-btn:hover{
+  background: var(--copper);
+  border-color: var(--copper);
+  color: #F7F5EF;
+}
+.tag-clear-btn:hover{
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.sort-control{
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sort-control label{
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-soft);
+}
+.sort-control select{
+  background: var(--paper-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 7px 10px;
+  font-size: 12px;
+}
+
+.count-line{
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-soft);
+  margin: 0 0 16px;
+}
+
+/* ---------- Link list ---------- */
+
+.link-list{
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.link-list.view-grid{
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.link-card{
+  position: relative;
+  display: grid;
+  grid-template-columns: auto auto 1fr auto;
+  gap: 14px;
+  align-items: start;
+  background: var(--paper-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  transition: border-color 0.12s ease, transform 0.12s ease, opacity 0.12s ease, box-shadow 0.12s ease;
+  animation: card-in 0.22s ease backwards;
+}
+
+@keyframes card-in{
+  from{ opacity: 0; transform: translateY(4px); }
+  to{ opacity: 1; transform: translateY(0); }
+}
+
+.link-card:hover{
+  border-color: var(--indigo-soft);
+}
+
+.link-card.is-favorite{
+  border-left: 3px solid var(--copper);
+}
+
+.link-card.has-problem{
+  border-left: 3px solid var(--danger);
+}
+
+/* If a node is both a favorite AND broken, the problem state takes visual
+   priority — knowing a link is dead is more actionable than the favorite mark. */
+.link-card.is-favorite.has-problem{
+  border-left: 3px solid var(--danger);
+}
+
+.link-card.is-recent{
+  animation: card-in 0.22s ease backwards, recent-highlight 2.6s ease-out;
+}
+
+@keyframes recent-highlight{
+  0%{ box-shadow: 0 0 0 2px var(--good); border-color: var(--good); }
+  15%{ box-shadow: 0 0 0 2px var(--good); border-color: var(--good); }
+  100%{ box-shadow: 0 0 0 0 transparent; }
+}
+
+.link-favicon{
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--indigo);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.link-favicon img{ width: 16px; height: 16px; }
+
+.link-body{ min-width: 0; }
+
+.link-title-row{
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.link-title{
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 17px;
+  color: var(--ink);
+  text-decoration: none;
+  line-height: 1.3;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+}
+.link-title:hover{ color: var(--indigo); }
+
+.favorite-star{
+  color: var(--copper);
+  font-size: 13px;
+}
+
+.link-url{
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--ink-soft);
+  text-decoration: none;
+  margin-top: 3px;
+  word-break: break-all;
+}
+.link-url:hover{ color: var(--indigo-soft); }
+
+.link-notes{
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--ink-soft);
+  line-height: 1.5;
+}
+
+/* .note-content-preview reuses .link-notes but is a <button> (so the whole
+   preview snippet is clickable to open the reading modal) rather than a
+   <p> — strip button chrome so it still reads as plain text. */
+.note-content-preview{
+  appearance: none;
+  border: none;
+  background: transparent;
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0;
+  cursor: pointer;
+  font-family: var(--font-body);
+}
+.note-content-preview:hover{ color: var(--ink); }
+
+.link-tags{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.link-tag{
+  appearance: none;
+  border: none;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--indigo) 12%, transparent);
+  color: var(--indigo);
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+.link-tag:hover{
+  background: var(--indigo);
+  color: #F7F5EF;
+}
+
+.link-footer-row{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.link-meta{
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink-soft);
+  opacity: 0.7;
+  margin: 0;
+}
+
+.link-actions{
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.icon-btn{
+  appearance: none;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--ink-soft);
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  transition: all 0.12s ease;
+}
+.icon-btn:hover{
+  border-color: var(--ink);
+  color: var(--ink);
+}
+.icon-btn.danger:hover{
+  border-color: var(--danger);
+  color: var(--danger);
+}
+.icon-btn.active{
+  color: var(--copper);
+  border-color: var(--copper);
+}
+
+/* ---------- Empty state ---------- */
+
+.empty-state{
+  display: none;
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--ink-soft);
+}
+.empty-state.visible{ display: block; }
+
+.empty-mark{
+  font-size: 30px;
+  color: var(--copper-soft);
+  display: block;
+  margin-bottom: 10px;
+}
+
+.empty-state p{ margin: 4px 0; }
+.empty-sub{ font-size: 13px; }
+
+/* ---------- Footer ---------- */
+
+.footbar{
+  position: relative;
+  z-index: 1;
+  border-top: 1px solid var(--line);
+  padding: 16px clamp(20px, 4vw, 56px);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-soft);
+}
+.footbar code{
+  background: var(--paper-raised);
+  border: 1px solid var(--line);
+  padding: 1px 6px;
+  border-radius: var(--radius);
+}
+
+/* ---------- Confirm dialog ---------- */
+
+.confirm-overlay{
+  position: fixed;
+  inset: 0;
+  /* Above the FAB (z-index: 55, see the mobile @media block above) so
+     confirm/import/stats/note-view modals aren't visually pierced by the
+     floating add button on mobile — the modal being open should mean
+     nothing else on the page is interactive or visible above it. */
+  z-index: 56;
+  background: rgba(31, 36, 33, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: overlay-in 0.15s ease;
+}
+
+@keyframes overlay-in{
+  from{ opacity: 0; }
+  to{ opacity: 1; }
+}
+
+.confirm-box{
+  background: var(--paper-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 22px;
+  width: 100%;
+  max-width: 360px;
+  box-shadow: 0 20px 48px -12px rgba(0,0,0,0.35);
+}
+
+.confirm-box h3{
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 8px;
+}
+
+.confirm-box p{
+  font-size: 13.5px;
+  color: var(--ink-soft);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.confirm-actions{
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+/* ---------- Toast ---------- */
+
+.toast{
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: var(--ink);
+  color: var(--paper-raised);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  padding: 10px 18px;
+  border-radius: var(--radius);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  z-index: 200;
+}
+.toast.visible{
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+.toast.error{ background: var(--danger); }
+.toast.success{ background: var(--good); }
+
+/* ---------- Active filters bar ---------- */
+
+.active-filters-bar{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 8px 12px;
+  margin-bottom: 4px;
+  font-size: 12.5px;
+}
+
+.active-filters-label{
+  color: var(--ink-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.active-filters-label strong{
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.clear-filters-btn{
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--indigo);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+.clear-filters-btn:hover{
+  text-decoration: underline;
+}
+
+/* ---------- Link check progress ---------- */
+
+.check-progress{
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-soft);
+  margin-left: auto;
+}
+
+.spinner{
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid var(--line);
+  border-top-color: var(--indigo);
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin{
+  to{ transform: rotate(360deg); }
+}
+
+.check-progress-cancel{
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-soft);
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 2px 8px;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.check-progress-cancel:hover:not(:disabled){
+  color: var(--ink);
+  border-color: var(--ink-soft);
+}
+
+.check-progress-cancel:disabled{
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* ---------- Link health status (ok / broken / blocked / unchecked) ---------- */
+
+.link-health-badge{
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+
+.link-health-badge[data-status="ok"]{
+  color: var(--good);
+  border-color: var(--good);
+}
+.link-health-badge[data-status="broken"]{
+  color: var(--danger);
+  border-color: var(--danger);
+}
+.link-health-badge[data-status="blocked"]{
+  color: var(--copper);
+  border-color: var(--copper);
+}
+.link-health-badge .health-dot{
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.link-health-badge .health-mark{
+  font-size: 8px;
+  line-height: 1;
+}
+
+/* ---------- Drag & drop reordering ---------- */
+
+.link-card.is-dragging{
+  opacity: 0.4;
+}
+
+.link-card.drag-over-top{
+  box-shadow: inset 0 3px 0 var(--indigo);
+}
+.link-card.drag-over-bottom{
+  box-shadow: inset 0 -3px 0 var(--indigo);
+}
+
+.drag-handle-group{
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  align-self: center;
+  opacity: 0.5;
+  transition: opacity 0.12s ease;
+}
+.link-card:hover .drag-handle-group,
+.drag-handle-group:focus-within{
+  opacity: 1;
+}
+
+.drag-handle{
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--ink-soft);
+  font-size: 9px;
+  line-height: 1;
+  padding: 3px 4px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+.drag-handle:hover{
+  background: var(--paper);
+  color: var(--indigo);
+}
+
+.drag-handle-icon{
+  color: var(--ink-soft);
+  font-size: 12px;
+  line-height: 1;
+  padding: 1px 0;
+}
+
+/* When not in manual sort mode, the handle icon collapses instead of just
+   hiding, so it doesn't reserve dead space in the card's grid layout. */
+.drag-handle-idle{
+  display: none;
+}
+
+/* ---------- Compact density ---------- */
+
+.link-list.density-compact .link-card{
+  padding: 8px 14px;
+  gap: 10px;
+}
+.link-list.density-compact .link-favicon{
+  width: 22px;
+  height: 22px;
+}
+.link-list.density-compact .link-title{
+  font-size: 14px;
+}
+.link-list.density-compact .link-url,
+.link-list.density-compact .link-notes,
+.link-list.density-compact .link-tags,
+.link-list.density-compact .link-footer-row{
+  display: none;
+}
+.link-list.density-compact .link-actions{
+  flex-direction: row;
+}
+
+/* ---------- Generic modal (import / stats / duplicates) ---------- */
+
+.modal-box{
+  max-width: 480px;
+  text-align: left;
+}
+
+.modal-box-header{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.modal-box-header h3{
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.btn-icon-close{
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--ink-soft);
+  font-size: 15px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: var(--radius);
+}
+.btn-icon-close:hover{ background: var(--paper); color: var(--ink); }
+
+/* ---------- Import ---------- */
+
+.import-tabs{
+  display: flex;
+  gap: 4px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.import-tab{
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--ink-soft);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 8px 4px;
+  margin-bottom: -1px;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+}
+.import-tab.active{
+  color: var(--indigo);
+  border-bottom-color: var(--indigo);
+}
+
+.import-panel .field{ margin-top: 12px; }
+
+.import-hint{
+  font-size: 13px;
+  color: var(--ink-soft);
+  line-height: 1.5;
+  margin: 0 0 10px;
+}
+.import-hint code{
+  background: var(--paper);
+  border: 1px solid var(--line);
+  padding: 1px 5px;
+  border-radius: var(--radius);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.import-result{
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--good);
+  background: rgba(62,107,79,0.1);
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  margin: 12px 0 0;
+}
+
+input[type="file"]{
+  width: 100%;
+  font-size: 12.5px;
+  color: var(--ink-soft);
+}
+
+/* ---------- Statistics ---------- */
+
+.stats-box{ max-width: 560px; }
+
+.stats-content{
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.stats-grid{
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: 10px;
+}
+
+.stat-tile{
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 12px;
+  text-align: center;
+}
+.stat-tile .stat-value{
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--indigo);
+  line-height: 1.1;
+}
+.stat-tile .stat-label{
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-soft);
+  margin-top: 4px;
+}
+.stat-tile.stat-broken .stat-value{ color: var(--danger); }
+
+/* ---------- Note reading view ---------- */
+
+.note-view-box{
+  max-width: 1920px;
+  width: 94vw;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  /* Safety net for the edit/add modal (which reuses this class): if the
+     form's content (title + tags + a tall auto-resized textarea + checkbox
+     + buttons) exceeds max-height, the whole box scrolls rather than
+     clipping the save/cancel buttons off-screen. The reading view's own
+     .note-view-body already scrolls internally and doesn't need this, but
+     it's harmless there too since that content rarely reaches the modal's
+     own max-height on top of the body's.
+  */
+  overflow-y: auto;
+}
+
+/* The add/edit modal is for writing, not just reading — taller than the
+   plain .note-view-box default so the (now much taller, min-height: 480px)
+   content textarea has real room to work in. Width now matches
+   .note-view-box's 1920px cap (both are effectively width: 94vw on any
+   screen up to that size) rather than a separate, smaller value, so the
+   edit modal isn't narrower than the reading one.
+*/
+.note-edit-box{
+  max-height: 94vh;
+}
+
+.note-view-header{
+  align-items: flex-start;
+  margin-bottom: 12px;
+  gap: 12px;
+}
+
+.note-view-heading{
+  min-width: 0; /* allows the long title to wrap/ellipsis instead of overflowing */
+  flex: 1;
+}
+
+.note-view-heading h3{
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.25;
+  margin: 0 0 6px;
+  word-break: break-word;
+}
+
+.note-view-meta{
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--ink-soft);
+  margin: 0;
+}
+
+.note-view-nav{
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  /* Sits between the title and the close button, so it needs its own top
+     margin to align with the close button rather than the (taller) title. */
+  margin-top: 2px;
+}
+
+.note-view-position{
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink-soft);
+  white-space: nowrap;
+  padding: 0 4px;
+  min-width: 52px;
+  text-align: center;
+}
+
+.note-view-nav .icon-btn:disabled{
+  opacity: 0.35;
+  cursor: default;
+}
+.note-view-nav .icon-btn:disabled:hover{
+  background: var(--paper);
+  color: var(--ink-soft);
+}
+
+.note-view-tags{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.note-view-body{
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--ink);
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 80px;
+  max-height: 65vh;
+  padding: 18px 20px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.note-view-body.is-empty{
+  color: var(--ink-soft);
+  font-style: italic;
+}
+
+.note-view-actions{
+  margin-top: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.note-view-actions-right{
+  display: flex;
+  gap: 8px;
+}
+
+#viewNoteFavorite.is-favorited{
+  color: var(--copper);
+  border-color: var(--copper-soft);
+}
+
+@media (max-width: 640px){
+  .note-view-box{ width: 94vw; padding: 18px; }
+  .note-view-heading h3{ font-size: 20px; }
+  .note-view-header{ flex-wrap: wrap; }
+  .note-view-nav{ order: 1; margin-left: auto; }
+  .note-view-actions{ flex-direction: column-reverse; align-items: stretch; }
+  .note-view-actions-right{ flex-direction: column; }
+}
+
+/* ---------- Duplicates ---------- */
+
+.duplicates-content{
+  max-height: 60vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.duplicate-group{
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 12px;
+  background: var(--paper);
+}
+.duplicate-group-url{
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-soft);
+  margin: 0 0 8px;
+  word-break: break-all;
+}
+.duplicate-group-header{
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.duplicate-group-header .duplicate-group-url{
+  margin-bottom: 0;
+  flex: 1;
+}
+.btn-small{
+  font-size: 11px;
+  padding: 4px 8px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.duplicate-item{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 0;
+  border-top: 1px solid var(--line);
+}
+.duplicate-item:first-of-type{ border-top: none; }
+.duplicate-item-title{
+  font-size: 13px;
+  color: var(--ink);
+}
+.duplicate-item-date{
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink-soft);
+}
+
+/* ---------- Preview popover (Open Graph) ---------- */
+
+.link-preview-popover{
+  position: fixed;
+  z-index: 60;
+  width: 280px;
+  background: var(--paper-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: 0 16px 40px -10px rgba(0,0,0,0.3);
+  padding: 12px;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.12s ease, transform 0.12s ease;
+}
+.link-preview-popover.visible{
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.preview-loading,
+.preview-empty{
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--ink-soft);
+  text-align: center;
+  padding: 20px 0;
+}
+
+.preview-image{
+  width: 100%;
+  height: 130px;
+  object-fit: cover;
+  border-radius: var(--radius);
+  margin-bottom: 8px;
+  background: var(--paper);
+}
+
+.preview-title{
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 14px;
+  margin: 0 0 4px;
+  line-height: 1.3;
+}
+
+.preview-description{
+  font-size: 12px;
+  color: var(--ink-soft);
+  line-height: 1.5;
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ---------- Focus visibility (a11y) ---------- */
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible{
+  outline: 2px solid var(--indigo);
+  outline-offset: 2px;
+}
+
+/* ---------- Tasks page ---------- */
+
+/* Task cards have no drag-handle/favicon column — just a checkbox, the
+   body, and the action buttons — so they override the shared .link-card's
+   4-column grid with their own 3-column layout. */
+.task-card{
+  grid-template-columns: auto 1fr auto;
+}
+
+.task-checkbox-wrap{
+  display: flex;
+  align-items: center;
+  height: 100%;
+  padding-top: 2px;
+}
+
+.task-checkbox{
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: var(--good);
+}
+
+.task-card.is-completed .link-title{
+  text-decoration: line-through;
+  color: var(--ink-soft);
+}
+
+.task-card.is-completed .link-notes{
+  opacity: 0.7;
+}
+
+.task-due-date{
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--ink-soft);
+}
+
+.task-due-date.is-overdue{
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.task-card.is-overdue:not(.is-completed){
+  border-color: var(--danger-tint);
+}
+
+.task-show-completed,
+.task-show-overdue{
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+/* ---------- Reduced motion ---------- */
+
+@media (prefers-reduced-motion: reduce){
+  *{
+    transition: none !important;
+    animation: none !important;
+  }
+}
