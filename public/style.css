@@ -33,7 +33,7 @@ body[data-theme="dark"] {
   --ink-soft:     #C9C3B3;
   --line:         #444;
   --indigo:       #8a99c4;
-  --indigo-soft:  #5a6b96;
+  --indigo-soft:  #aab7d8;
   --copper:       #f0a423;
   --copper-soft:  #b5642e;
   --good:         #5c9e74;
@@ -646,6 +646,8 @@ button, input, textarea, select{
   color: var(--ink-soft);
   cursor: pointer;
   transition: all 0.12s ease;
+  overflow-wrap: break-word;
+  max-width: 100%;
 }
 .tag-chip:hover{ border-color: var(--indigo-soft); color: var(--ink); }
 .tag-chip.active{
@@ -891,6 +893,7 @@ button, input, textarea, select{
   padding: 0;
   cursor: pointer;
   text-align: left;
+  overflow-wrap: break-word;
 }
 .link-title:hover{ color: var(--indigo); }
 
@@ -915,6 +918,7 @@ button, input, textarea, select{
   font-size: 13px;
   color: var(--ink-soft);
   line-height: 1.5;
+  overflow-wrap: break-word;
 }
 
 /* .note-content-preview reuses .link-notes but is a <button> (so the whole

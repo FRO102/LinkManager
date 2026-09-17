@@ -5,6 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const { BACKUP_DIR } = require('../lib/config');
 const db = require('../lib/db');
+const { AppError } = require('../lib/errors');
 const { createBackup, listBackups } = require('../lib/backups');
 
 const router = express.Router();
@@ -18,7 +19,7 @@ router.post('/', (req, res) => {
   res.json({ success: true, backups: listBackups() });
 });
 
-router.post('/:file/restore', (req, res) => {
+router.post('/:file/restore', (req, res, next) => {
   const file = req.params.file;
   const filePath = path.join(BACKUP_DIR, file);
   // Explicit containment check in addition to the filename pattern below —
@@ -27,7 +28,7 @@ router.post('/:file/restore', (req, res) => {
   const isContained = filePath === path.join(BACKUP_DIR, path.basename(filePath))
     && filePath.startsWith(BACKUP_DIR + path.sep);
   if (!isContained || !file.startsWith('links-') || !file.endsWith('.db') || !fs.existsSync(filePath)) {
-    return res.status(404).json({ error: 'Backup not found' });
+    return next(new AppError('Backup not found', 404, 'BACKUP_NOT_FOUND'));
   }
   try {
     // Backs up the current state before restoring, for safety
@@ -56,7 +57,7 @@ router.post('/:file/restore', (req, res) => {
     }
   } catch (err) {
     console.error('Error restoring backup:', err);
-    res.status(500).json({ error: 'Error restoring backup' });
+    next(new AppError('Error restoring backup', 500, 'RESTORE_FAILED'));
   }
 });
 

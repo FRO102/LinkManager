@@ -3,6 +3,7 @@
 ![Node.js v20](https://img.shields.io/badge/node-%3E%3D20.6.0-green)
 ![Docker](https://img.shields.io/badge/docker-%22latest%22-blue)
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
+![Build Status](https://github.com/fro/link-manager/actions/workflows/ci.yml/badge.svg)
 
 A professional web app for managing a personal collection of links ("nodes"): add, edit, delete, search, filter, drag-to-reorder, import from other sources, check for broken links, and view statistics. 
 
@@ -110,7 +111,7 @@ docker compose up -d --build
 To stop: `docker compose down`. Data is persisted in the `./data/` volume.
 
 ### Detailed Local Setup (Development)
-Prerequisite: Node.js **20.6+** (required for native environment file support).
+Prerequisite: Node.js 18+ (for native `fetch`). Node 20.6+ is recommended for native environment file support.
 
 ```bash
 npm install
@@ -154,11 +155,6 @@ link-manager/
 │   ├── backups.js          # Database snapshots & rotation
 │   └── rate-limit.js       # In-memory rate limiter
 ├── routes/               # Express routers (api endpoints)
-│   ├── links.js         # Links API
-│   ├── notes.js         # Notes API
-│   ├── tasks.js         # Tasks API
-│   ├── backups.js       # Backup management
-│   └── import.js        # Data import logic
 ├── public/                # Static frontend (HTML/CSS/JS)
 ├── test/                  # Automated test suite (node:test)
 ├── Dockerfile             # Multi-stage build for native modules
@@ -170,7 +166,7 @@ The API is divided into **Links**, **Notes**, **Tasks**, and **Shared** endpoint
 - **Links**: `GET /api/links`, `POST /api/links`, `PUT /api/links/:id`, `DELETE /api/links/:id`, etc.
 - **Notes**: Similar shape to links, focused on content instead of URLs.
 - **Tasks**: Focused on due-dates and completion status.
-- **Shared**: `/api/backups` (CRUD for snapshots), `/api/import` (data ingestion), and `/api/health`.
+- **Shared**: `/api/backups` (CRUD for snapshots) and `/api/health`.
 
 ### Data Storage & Backups
 All data is stored in a single SQLite database (`data/links.db`) using **WAL mode**.
@@ -198,23 +194,6 @@ We welcome contributions! To keep the project maintainable, please follow these 
 2. Implement your changes.
 3. Run the full test suite: `npm test`.
 4. Submit a Pull Request with a clear description of the changes and any related issues.
-
----
-
-## 🚢 Publication & Deployment
-
-This project includes a helper script to automate publication to Git and Docker Hub.
-
-### Using `publish.sh`
-```bash
-chmod +x publish.sh
-./publish.sh
-```
-**Workflow**:
-1. The script will prompt you for the **Git Repository URL**.
-2. It will prompt you for the **Docker Image Name** (e.g., `username/link-manager:latest`).
-3. It automatically performs: `git init` $\rightarrow$ `add` $\rightarrow$ `commit` $\rightarrow$ `push`.
-4. It then performs: `docker build` $\rightarrow$ `docker push`.
 
 ---
 

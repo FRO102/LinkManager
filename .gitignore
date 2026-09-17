@@ -7,3 +7,5 @@ data/*.json.bak
 data/backups/
 !data/.gitkeep
 .env
+publish.sh
+.dockerignore

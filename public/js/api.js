@@ -7,7 +7,10 @@ const API = '/api/links';
 
 export async function apiList() {
   const res = await fetch(API);
-  if (!res.ok) throw new Error('Failed to load');
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error?.message || data.error || 'Failed to load');
+  }
   return res.json();
 }
 
@@ -18,7 +21,7 @@ export async function apiCreate(payload) {
     body: JSON.stringify(payload),
   });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Error creating node');
+  if (!res.ok) throw new Error(data.error?.message || data.error || 'Error creating node');
   return data;
 }
 
@@ -29,7 +32,7 @@ export async function apiUpdate(id, payload) {
     body: JSON.stringify(payload),
   });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Error updating node');
+  if (!res.ok) throw new Error(data.error?.message || data.error || 'Error updating node');
   return data;
 }
 
@@ -37,7 +40,7 @@ export async function apiDelete(id) {
   const res = await fetch(`${API}/${id}`, { method: 'DELETE' });
   if (!res.ok) {
     const data = await res.json();
-    throw new Error(data.error || 'Error removing node');
+    throw new Error(data.error?.message || data.error || 'Error removing node');
   }
 }
 
@@ -48,7 +51,7 @@ export async function apiBulkDelete(ids) {
     body: JSON.stringify({ ids }),
   });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Error removing nodes');
+  if (!res.ok) throw new Error(data.error?.message || data.error || 'Error removing nodes');
   return data;
 }
 
@@ -58,27 +61,30 @@ export async function apiReorder(orderedIds) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ orderedIds }),
   });
-  if (!res.ok) throw new Error('Error saving new order');
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error?.message || data.error || 'Error saving new order');
+  }
 }
 
 export async function apiCheckOne(id) {
   const res = await fetch(`${API}/${id}/check`, { method: 'POST' });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Error checking link');
+  if (!res.ok) throw new Error(data.error?.message || data.error || 'Error checking link');
   return data;
 }
 
 export async function apiCheckAll() {
   const res = await fetch(`${API}/check-all`, { method: 'POST' });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Error checking links');
+  if (!res.ok) throw new Error(data.error?.message || data.error || 'Error checking links');
   return data;
 }
 
 export async function apiCheckCancel() {
   const res = await fetch(`${API}/check-all/cancel`, { method: 'POST' });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Error cancelling check');
+  if (!res.ok) throw new Error(data.error?.message || data.error || 'Error cancelling check');
   return data;
 }
 
@@ -100,7 +106,7 @@ export async function apiImportBookmarks(html, defaultTags) {
     body: JSON.stringify({ html, defaultTags }),
   });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Error importing bookmarks');
+  if (!res.ok) throw new Error(data.error?.message || data.error || 'Error importing bookmarks');
   return data;
 }
 
@@ -111,7 +117,7 @@ export async function apiImportJson(items, defaultTags) {
     body: JSON.stringify({ items, defaultTags }),
   });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Error importing file');
+  if (!res.ok) throw new Error(data.error?.message || data.error || 'Error importing file');
   return data;
 }
 

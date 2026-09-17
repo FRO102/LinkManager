@@ -554,7 +554,11 @@ import {
     chip.type = 'button';
     chip.className = 'tag-chip' + (activeTagFilters.has(tag) ? ' active' : '');
     chip.setAttribute('aria-pressed', String(activeTagFilters.has(tag)));
-    chip.innerHTML = `${escapeHtml(tag)} <span class="tag-count">${count}</span>`;
+    chip.textContent = tag;
+    const countSpan = document.createElement('span');
+    countSpan.className = 'tag-count';
+    countSpan.textContent = count;
+    chip.appendChild(countSpan);
     chip.addEventListener('click', () => {
       if (activeTagFilters.has(tag)) {
         activeTagFilters.delete(tag);
@@ -817,27 +821,55 @@ import {
         </span>`
       : `<span class="drag-handle-icon drag-handle-idle" aria-hidden="true">⠿</span>`;
 
-    li.innerHTML = `
+    const card = document.createElement('li');
+    card.className = li.className;
+    card.dataset.id = li.dataset.id;
+    card.draggable = li.draggable;
+
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = `
       ${dragHandle}
       <div class="link-favicon" aria-hidden="true">✎</div>
       <div class="link-body">
         <div class="link-title-row">
-          <button type="button" class="link-title" data-action="view" data-id="${note.id}">${escapeHtml(note.title)}</button>
+          <button type="button" class="link-title" data-action="view" data-id="${note.id}"></button>
           ${note.favorite ? '<span class="favorite-star" title="Favorite">★</span>' : ''}
         </div>
-        ${note.content ? `<button type="button" class="link-notes note-content-preview" data-action="view" data-id="${note.id}">${escapeHtml(contentPreview(note.content))}</button>` : ''}
-        ${tags.length ? `<div class="link-tags">${tags.map(t => `<button type="button" class="link-tag" data-action="filter-tag" data-tag="${escapeHtml(t)}">${escapeHtml(t)}</button>`).join('')}</div>` : ''}
+        ${note.content ? `<button type="button" class="link-notes note-content-preview" data-action="view" data-id="${note.id}"></button>` : ''}
+        ${tags.length ? `<div class="link-tags"></div>` : ''}
         <div class="link-footer-row">
-          <p class="link-meta">added ${formatDate(note.createdAt)}</p>
+          <p class="link-meta"></p>
         </div>
       </div>
       <div class="link-actions">
-        <button class="icon-btn fav-btn${note.favorite ? ' active' : ''}" title="Toggle favorite" data-action="favorite" data-id="${note.id}">★</button>
-        <button class="icon-btn" title="Edit" data-action="edit" data-id="${note.id}">✎</button>
-        <button class="icon-btn danger" title="Remove" data-action="delete" data-id="${note.id}">✕</button>
+        <button class="icon-btn fav-btn${note.favorite ? ' active' : ''}" title="Toggle favorite" aria-label="Toggle favorite" data-action="favorite" data-id="${note.id}">★</button>
+        <button class="icon-btn" title="Edit" aria-label="Edit note" data-action="edit" data-id="${note.id}">✎</button>
+        <button class="icon-btn danger" title="Remove" aria-label="Remove note" data-action="delete" data-id="${note.id}">✕</button>
       </div>
     `;
-    return li;
+
+    tempDiv.querySelector('.link-title').textContent = note.title;
+    if (note.content) {
+      tempDiv.querySelector('.link-notes').textContent = contentPreview(note.content);
+    }
+    if (tags.length) {
+      const tagsDiv = tempDiv.querySelector('.link-tags');
+      tags.forEach(t => {
+        const tBtn = document.createElement('button');
+        tBtn.type = 'button';
+        tBtn.className = 'link-tag';
+        tBtn.dataset.action = 'filter-tag';
+        tBtn.dataset.tag = t;
+        tBtn.textContent = t;
+        tagsDiv.appendChild(tBtn);
+      });
+    }
+    tempDiv.querySelector('.link-meta').textContent = `added ${formatDate(note.createdAt)}`;
+
+    while (tempDiv.firstChild) {
+      card.appendChild(tempDiv.firstChild);
+    }
+    return card;
   }
 
   function render() {
@@ -1225,9 +1257,18 @@ import {
     viewNoteMeta.textContent = created + edited;
 
     const tags = note.tags || [];
-    viewNoteTags.innerHTML = tags.length
-      ? tags.map(t => `<button type="button" class="link-tag" data-action="filter-tag" data-tag="${escapeHtml(t)}">${escapeHtml(t)}</button>`).join('')
-      : '';
+    viewNoteTags.innerHTML = '';
+    if (tags.length) {
+      tags.forEach(t => {
+        const tBtn = document.createElement('button');
+        tBtn.type = 'button';
+        tBtn.className = 'link-tag';
+        tBtn.dataset.action = 'filter-tag';
+        tBtn.dataset.tag = t;
+        tBtn.textContent = t;
+        viewNoteTags.appendChild(tBtn);
+      });
+    }
 
     if (note.content && note.content.trim()) {
       viewNoteBody.textContent = note.content; // textContent preserves line breaks via white-space: pre-wrap in CSS
@@ -1324,13 +1365,22 @@ import {
 
   async function openStatsModal() {
     statsOverlay.classList.remove('hidden');
-    statsContent.innerHTML = '<p class="import-hint">Loading…</p>';
+    statsContent.innerHTML = '';
+    const loadingP = document.createElement('p');
+    loadingP.className = 'import-hint';
+    loadingP.textContent = 'Loading…';
+    statsContent.appendChild(loadingP);
     trapFocus(document.querySelector('#statsOverlay .confirm-box'));
     try {
       const stats = await apiStats();
-      statsContent.innerHTML = renderStatsHtml(stats);
+      statsContent.innerHTML = '';
+      statsContent.appendChild(renderStatsHtml(stats));
     } catch (err) {
-      statsContent.innerHTML = `<p class="form-error">${escapeHtml(err.message)}</p>`;
+      statsContent.innerHTML = '';
+      const errP = document.createElement('p');
+      errP.className = 'form-error';
+      errP.textContent = err.message;
+      statsContent.appendChild(errP);
     }
   }
 
@@ -1340,22 +1390,30 @@ import {
   }
 
   function renderStatsHtml(stats) {
-    return `
-      <div class="stats-grid">
-        <div class="stat-tile">
-          <div class="stat-value">${stats.total}</div>
-          <div class="stat-label">Total notes</div>
-        </div>
-        <div class="stat-tile">
-          <div class="stat-value">${stats.favorites}</div>
-          <div class="stat-label">Favorites</div>
-        </div>
-        <div class="stat-tile">
-          <div class="stat-value">${stats.totalTags}</div>
-          <div class="stat-label">Tags</div>
-        </div>
-      </div>
-    `;
+    const grid = document.createElement('div');
+    grid.className = 'stats-grid';
+
+    const createTile = (value, label) => {
+      const tile = document.createElement('div');
+      tile.className = 'stat-tile';
+
+      const valEl = document.createElement('div');
+      valEl.className = 'stat-value';
+      valEl.textContent = value;
+
+      const labEl = document.createElement('div');
+      labEl.className = 'stat-label';
+      labEl.textContent = label;
+
+      tile.appendChild(valEl);
+      tile.appendChild(labEl);
+      return tile;
+    };
+
+    grid.appendChild(createTile(stats.total, 'Total notes'));
+    grid.appendChild(createTile(stats.favorites, 'Favorites'));
+    grid.appendChild(createTile(stats.totalTags, 'Tags'));
+    return grid;
   }
 
   // ---------- Overflow "More actions" menu ----------
@@ -1435,7 +1493,10 @@ import {
     }
 
     activeFiltersBar.classList.remove('hidden');
-    activeFiltersLabel.innerHTML = `Filtering by <strong>${escapeHtml(parts.join(' + '))}</strong>`;
+    activeFiltersLabel.textContent = 'Filtering by ';
+    const strong = document.createElement('strong');
+    strong.textContent = parts.join(' + ');
+    activeFiltersLabel.appendChild(strong);
   }
 
   // ---------- Init ----------

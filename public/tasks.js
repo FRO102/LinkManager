@@ -436,24 +436,49 @@ import {
       + (recentlyAddedIds.has(task.id) ? ' is-recent' : '');
     li.dataset.id = task.id;
 
-    li.innerHTML = `
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = `
       <label class="task-checkbox-wrap">
-        <input type="checkbox" class="task-checkbox" data-action="toggle-completed" data-id="${task.id}" ${task.completed ? 'checked' : ''} aria-label="Mark ${escapeHtml(task.title)} as ${task.completed ? 'not completed' : 'completed'}">
+        <input type="checkbox" class="task-checkbox" data-action="toggle-completed" data-id="${task.id}" ${task.completed ? 'checked' : ''} aria-label="Mark task as ${task.completed ? 'not completed' : 'completed'}">
       </label>
       <div class="link-body">
         <div class="link-title-row">
-          <button type="button" class="link-title" data-action="edit" data-id="${task.id}">${escapeHtml(task.title)}</button>
+          <button type="button" class="link-title" data-action="edit" data-id="${task.id}"></button>
         </div>
-        ${task.description ? `<p class="link-notes">${escapeHtml(descriptionPreview(task.description))}</p>` : ''}
+        <p class="link-notes"></p>
         <div class="link-footer-row">
-          ${task.dueDate ? dueDateLabel(task) : '<span class="link-meta">no due date</span>'}
+          <span class="link-meta"></span>
         </div>
       </div>
       <div class="link-actions">
-        <button class="icon-btn" title="Edit" data-action="edit" data-id="${task.id}">✎</button>
-        <button class="icon-btn danger" title="Remove" data-action="delete" data-id="${task.id}">✕</button>
+        <button class="icon-btn" title="Edit" aria-label="Edit task" data-action="edit" data-id="${task.id}">✎</button>
+        <button class="icon-btn danger" title="Remove" aria-label="Remove task" data-action="delete" data-id="${task.id}">✕</button>
       </div>
     `;
+
+    const titleBtn = tempDiv.querySelector('.link-title');
+    titleBtn.textContent = task.title;
+
+    if (task.description) {
+      const notesP = tempDiv.querySelector('.link-notes');
+      notesP.textContent = descriptionPreview(task.description);
+      notesP.classList.remove('hidden'); // assuming it has a hidden class or is handled by CSS
+    } else {
+      tempDiv.querySelector('.link-notes').classList.add('hidden');
+    }
+
+    const metaSpan = tempDiv.querySelector('.link-meta');
+    if (task.dueDate) {
+      const overdue = isOverdue(task);
+      metaSpan.className = `task-due-date ${overdue ? 'is-overdue' : ''}`;
+      metaSpan.textContent = `${overdue ? '⚠ overdue — ' : 'due '}${formatDate(task.dueDate)}`;
+    } else {
+      metaSpan.textContent = 'no due date';
+    }
+
+    while (tempDiv.firstChild) {
+      li.appendChild(tempDiv.firstChild);
+    }
     return li;
   }
 
@@ -617,13 +642,22 @@ import {
 
   async function openStatsModal() {
     statsOverlay.classList.remove('hidden');
-    statsContent.innerHTML = '<p class="import-hint">Loading…</p>';
+    statsContent.innerHTML = '';
+    const loadingP = document.createElement('p');
+    loadingP.className = 'import-hint';
+    loadingP.textContent = 'Loading…';
+    statsContent.appendChild(loadingP);
     trapFocus(document.querySelector('#statsOverlay .confirm-box'));
     try {
       const stats = await apiStats();
-      statsContent.innerHTML = renderStatsHtml(stats);
+      statsContent.innerHTML = '';
+      statsContent.appendChild(renderStatsHtml(stats));
     } catch (err) {
-      statsContent.innerHTML = `<p class="form-error">${escapeHtml(err.message)}</p>`;
+      statsContent.innerHTML = '';
+      const errP = document.createElement('p');
+      errP.className = 'form-error';
+      errP.textContent = err.message;
+      statsContent.appendChild(errP);
     }
   }
 
@@ -633,26 +667,31 @@ import {
   }
 
   function renderStatsHtml(stats) {
-    return `
-      <div class="stats-grid">
-        <div class="stat-tile">
-          <div class="stat-value">${stats.total}</div>
-          <div class="stat-label">Total tasks</div>
-        </div>
-        <div class="stat-tile">
-          <div class="stat-value">${stats.outstanding}</div>
-          <div class="stat-label">Outstanding</div>
-        </div>
-        <div class="stat-tile">
-          <div class="stat-value">${stats.completed}</div>
-          <div class="stat-label">Completed</div>
-        </div>
-        <div class="stat-tile${stats.overdue > 0 ? ' stat-broken' : ''}">
-          <div class="stat-value">${stats.overdue}</div>
-          <div class="stat-label">Overdue</div>
-        </div>
-      </div>
-    `;
+    const grid = document.createElement('div');
+    grid.className = 'stats-grid';
+
+    const createTile = (value, label, className = '') => {
+      const tile = document.createElement('div');
+      tile.className = 'stat-tile' + (className ? ' ' + className : '');
+
+      const valEl = document.createElement('div');
+      valEl.className = 'stat-value';
+      valEl.textContent = value;
+
+      const labEl = document.createElement('div');
+      labEl.className = 'stat-label';
+      labEl.textContent = label;
+
+      tile.appendChild(valEl);
+      tile.appendChild(labEl);
+      return tile;
+    };
+
+    grid.appendChild(createTile(stats.total, 'Total tasks'));
+    grid.appendChild(createTile(stats.outstanding, 'Outstanding'));
+    grid.appendChild(createTile(stats.completed, 'Completed'));
+    grid.appendChild(createTile(stats.overdue, 'Overdue', stats.overdue > 0 ? 'stat-broken' : ''));
+    return grid;
   }
 
   // ---------- Clear completed ----------
@@ -731,7 +770,10 @@ import {
     }
 
     activeFiltersBar.classList.remove('hidden');
-    activeFiltersLabel.innerHTML = `Filtering by <strong>${escapeHtml(parts.join(' + '))}</strong>`;
+    activeFiltersLabel.textContent = 'Filtering by ';
+    const strong = document.createElement('strong');
+    strong.textContent = parts.join(' + ');
+    activeFiltersLabel.appendChild(strong);
   }
 
   // ---------- Init ----------

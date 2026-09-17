@@ -7,6 +7,7 @@ const path = require('path');
 const { PORT, LINK_CHECK_INTERVAL_MS, AUTH_TOKEN } = require('./lib/config');
 const { createBackup } = require('./lib/backups');
 const { runCheckAllInBackground } = require('./lib/link-check');
+const { AppError } = require('./lib/errors');
 
 const linksRouter = require('./routes/links');
 const importRouter = require('./routes/import');
@@ -79,6 +80,27 @@ app.use('/api/notes', notesRouter);
 app.use('/api/tasks/import', tasksImportRouter);
 app.use('/api/tasks', tasksMiscRouter);
 app.use('/api/tasks', tasksRouter);
+
+// Centralized error handling middleware.
+// Catch-all for any errors thrown in routes, which are passed via next(err).
+app.use((err, req, res, next) => {
+  const isAppError = err instanceof AppError;
+  const status = isAppError ? err.statusCode : 500;
+  const code = isAppError ? err.code : 'INTERNAL_ERROR';
+  const message = err.message || 'An unexpected error occurred';
+
+  if (status === 500) {
+    console.error(`[Server Error] ${req.method} ${req.url}:`, err);
+  }
+
+  res.status(status).json({
+    error: {
+      message,
+      code,
+      status,
+    },
+  });
+});
 
 // Only actually start listening (and the background timers) when this file is
 // run directly — e.g. `node server.js`. When it's require()'d instead (as the

@@ -347,7 +347,11 @@ import {
     chip.type = 'button';
     chip.className = 'tag-chip' + (activeTagFilters.has(tag) ? ' active' : '');
     chip.setAttribute('aria-pressed', String(activeTagFilters.has(tag)));
-    chip.innerHTML = `${escapeHtml(tag)} <span class="tag-count">${count}</span>`;
+    chip.textContent = tag;
+    const countSpan = document.createElement('span');
+    countSpan.className = 'tag-count';
+    countSpan.textContent = count;
+    chip.appendChild(countSpan);
     chip.addEventListener('click', () => {
       if (activeTagFilters.has(tag)) {
         activeTagFilters.delete(tag);
@@ -648,7 +652,18 @@ import {
         </span>`
       : `<span class="drag-handle-icon drag-handle-idle" aria-hidden="true">⠿</span>`;
 
-    li.innerHTML = `
+    const card = document.createElement('li');
+    card.className = 'link-card'
+      + (link.favorite ? ' is-favorite' : '')
+      + (isProblem ? ' has-problem' : '')
+      + (recentlyAddedIds.has(link.id) ? ' is-recent' : '');
+    card.dataset.id = link.id;
+    card.draggable = sortMode === 'manual';
+
+    // We use a temporary container to parse the HTML structure,
+    // but we will replace the dangerous parts with textContent.
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = `
       ${dragHandle}
       <div class="link-favicon">${favicon ? `<img src="${favicon}" alt="" loading="lazy" onerror="this.parentElement.textContent='◈'">` : '◈'}</div>
       <div class="link-body">
@@ -657,21 +672,42 @@ import {
           ${link.favorite ? '<span class="favorite-star" title="Favorite">★</span>' : ''}
         </div>
         <a class="link-url" href="${escapeHtml(link.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(hostnameFor(link.url))}</a>
-        ${link.description ? `<p class="link-notes">${escapeHtml(link.description)}</p>` : ''}
-        ${tags.length ? `<div class="link-tags">${tags.map(t => `<button type="button" class="link-tag" data-action="filter-tag" data-tag="${escapeHtml(t)}">${escapeHtml(t)}</button>`).join('')}</div>` : ''}
+        ${link.description ? `<p class="link-notes"></p>` : ''}
+        ${tags.length ? `<div class="link-tags"></div>` : ''}
         <div class="link-footer-row">
-          <p class="link-meta">added ${formatDate(link.createdAt)}</p>
+          <p class="link-meta"></p>
           ${healthBadge}
         </div>
       </div>
       <div class="link-actions">
-        <button class="icon-btn fav-btn${link.favorite ? ' active' : ''}" title="Toggle favorite" data-action="favorite" data-id="${link.id}">★</button>
-        <button class="icon-btn" title="Copy URL" data-action="copy" data-id="${link.id}">⧉</button>
-        <button class="icon-btn" title="Edit" data-action="edit" data-id="${link.id}">✎</button>
-        <button class="icon-btn danger" title="Remove" data-action="delete" data-id="${link.id}">✕</button>
+        <button class="icon-btn fav-btn${link.favorite ? ' active' : ''}" title="Toggle favorite" aria-label="Toggle favorite" data-action="favorite" data-id="${link.id}">★</button>
+        <button class="icon-btn" title="Copy URL" aria-label="Copy URL" data-action="copy" data-id="${link.id}">⧉</button>
+        <button class="icon-btn" title="Edit" aria-label="Edit node" data-action="edit" data-id="${link.id}">✎</button>
+        <button class="icon-btn danger" title="Remove" aria-label="Remove node" data-action="delete" data-id="${link.id}">✕</button>
       </div>
     `;
-    return li;
+
+    if (link.description) {
+      tempDiv.querySelector('.link-notes').textContent = link.description;
+    }
+    if (tags.length) {
+      const tagsDiv = tempDiv.querySelector('.link-tags');
+      tags.forEach(t => {
+        const tBtn = document.createElement('button');
+        tBtn.type = 'button';
+        tBtn.className = 'link-tag';
+        tBtn.dataset.action = 'filter-tag';
+        tBtn.dataset.tag = t;
+        tBtn.textContent = t;
+        tagsDiv.appendChild(tBtn);
+      });
+    }
+    tempDiv.querySelector('.link-meta').textContent = `added ${formatDate(link.createdAt)}`;
+
+    while (tempDiv.firstChild) {
+      card.appendChild(tempDiv.firstChild);
+    }
+    return card;
   }
 
   function render() {
@@ -1180,9 +1216,11 @@ import {
     trapFocus(document.querySelector('#statsOverlay .confirm-box'));
     try {
       const stats = await apiStats();
-      statsContent.innerHTML = renderStatsHtml(stats);
+      statsContent.innerHTML = '';
+      statsContent.appendChild(renderStatsHtml(stats));
     } catch (err) {
-      statsContent.innerHTML = `<p class="form-error">${escapeHtml(err.message)}</p>`;
+      statsContent.textContent = err.message;
+      statsContent.className = 'form-error';
     }
   }
 
@@ -1192,65 +1230,109 @@ import {
   }
 
   function renderStatsHtml(stats) {
-    return `
-      <div class="stats-grid">
-        <div class="stat-tile">
-          <div class="stat-value">${stats.total}</div>
-          <div class="stat-label">Total nodes</div>
-        </div>
-        <div class="stat-tile">
-          <div class="stat-value">${stats.favorites}</div>
-          <div class="stat-label">Favorites</div>
-        </div>
-        <div class="stat-tile">
-          <div class="stat-value">${stats.totalTags}</div>
-          <div class="stat-label">Tags</div>
-        </div>
-        <div class="stat-tile">
-          <div class="stat-value">${stats.linkHealth.ok}</div>
-          <div class="stat-label">Links ok</div>
-        </div>
-        <div class="stat-tile stat-broken">
-          <div class="stat-value">${stats.linkHealth.broken}</div>
-          <div class="stat-label">Broken</div>
-        </div>
-      </div>
-    `;
+    const grid = document.createElement('div');
+    grid.className = 'stats-grid';
+
+    const createTile = (value, label, className = '') => {
+      const tile = document.createElement('div');
+      tile.className = 'stat-tile' + (className ? ' ' + className : '');
+
+      const valEl = document.createElement('div');
+      valEl.className = 'stat-value';
+      valEl.textContent = value;
+
+      const labEl = document.createElement('div');
+      labEl.className = 'stat-label';
+      labEl.textContent = label;
+
+      tile.appendChild(valEl);
+      tile.appendChild(labEl);
+      return tile;
+    };
+
+    grid.appendChild(createTile(stats.total, 'Total nodes'));
+    grid.appendChild(createTile(stats.favorites, 'Favorites'));
+    grid.appendChild(createTile(stats.totalTags, 'Tags'));
+    grid.appendChild(createTile(stats.linkHealth.ok, 'Links ok'));
+    grid.appendChild(createTile(stats.linkHealth.broken, 'Broken', 'stat-broken'));
+
+    return grid;
   }
 
   // ---------- Duplicates ----------
 
   async function openDuplicatesModal() {
     duplicatesOverlay.classList.remove('hidden');
-    duplicatesContent.innerHTML = '<p class="import-hint">Looking for duplicates…</p>';
+    duplicatesContent.innerHTML = '';
+    const loadingP = document.createElement('p');
+    loadingP.className = 'import-hint';
+    loadingP.textContent = 'Looking for duplicates…';
+    duplicatesContent.appendChild(loadingP);
     trapFocus(document.querySelector('#duplicatesOverlay .confirm-box'));
     try {
       const groups = await apiDuplicates();
+      duplicatesContent.innerHTML = '';
       if (groups.length === 0) {
-        duplicatesContent.innerHTML = '<p class="import-hint">No duplicate nodes found. 🎉</p>';
+        const emptyP = document.createElement('p');
+        emptyP.className = 'import-hint';
+        emptyP.textContent = 'No duplicate nodes found. 🎉';
+        duplicatesContent.appendChild(emptyP);
         return;
       }
-      duplicatesContent.innerHTML = groups.map(group => `
-        <div class="duplicate-group">
-          <div class="duplicate-group-header">
-            <p class="duplicate-group-url">${escapeHtml(group[0].url)}</p>
-            <button class="btn btn-ghost btn-small" data-action="keep-first-in-group"
-              data-ids="${group.slice(1).map(l => l.id).join(',')}"
-              title="Remove every copy in this group except the oldest one">
-              Keep oldest, remove ${group.length - 1}
-            </button>
-          </div>
-          ${group.map(l => `
-            <div class="duplicate-item">
-              <span class="duplicate-item-title">${escapeHtml(l.title)}</span>
-              <span class="duplicate-item-date">${formatDate(l.createdAt)}</span>
-              <button class="icon-btn danger" data-action="delete-duplicate" data-id="${l.id}" title="Remove this one">✕</button>
-            </div>
-          `).join('')}
-        </div>
-      `).join('');
+      groups.forEach(group => {
+        const groupDiv = document.createElement('div');
+        groupDiv.className = 'duplicate-group';
+
+        const header = document.createElement('div');
+        header.className = 'duplicate-group-header';
+
+        const urlP = document.createElement('p');
+        urlP.className = 'duplicate-group-url';
+        urlP.textContent = group[0].url;
+
+        const bulkBtn = document.createElement('button');
+        bulkBtn.className = 'btn btn-ghost btn-small';
+        bulkBtn.dataset.action = 'keep-first-in-group';
+        bulkBtn.dataset.ids = group.slice(1).map(l => l.id).join(',');
+        bulkBtn.title = 'Remove every copy in this group except the oldest one';
+        bulkBtn.textContent = `Keep oldest, remove ${group.length - 1}`;
+
+        header.appendChild(urlP);
+        header.appendChild(bulkBtn);
+        groupDiv.appendChild(header);
+
+        group.forEach(l => {
+          const item = document.createElement('div');
+          item.className = 'duplicate-item';
+
+          const titleSpan = document.createElement('span');
+          titleSpan.className = 'duplicate-item-title';
+          titleSpan.textContent = l.title;
+
+          const dateSpan = document.createElement('span');
+          dateSpan.className = 'duplicate-item-date';
+          dateSpan.textContent = formatDate(l.createdAt);
+
+          const delBtn = document.createElement('button');
+          delBtn.className = 'icon-btn danger';
+          delBtn.dataset.action = 'delete-duplicate';
+          delBtn.dataset.id = l.id;
+          delBtn.title = 'Remove this one';
+          delBtn.textContent = '✕';
+
+          item.appendChild(titleSpan);
+          item.appendChild(dateSpan);
+          item.appendChild(delBtn);
+          groupDiv.appendChild(item);
+        });
+        duplicatesContent.appendChild(groupDiv);
+      });
     } catch (err) {
-      duplicatesContent.innerHTML = `<p class="form-error">${escapeHtml(err.message)}</p>`;
+      duplicatesContent.innerHTML = '';
+      const errP = document.createElement('p');
+      errP.className = 'form-error';
+      errP.textContent = err.message;
+      duplicatesContent.appendChild(errP);
     }
   }
 
@@ -1369,7 +1451,10 @@ import {
     }
 
     activeFiltersBar.classList.remove('hidden');
-    activeFiltersLabel.innerHTML = `Filtering by <strong>${escapeHtml(parts.join(' + '))}</strong>`;
+    activeFiltersLabel.textContent = 'Filtering by ';
+    const strong = document.createElement('strong');
+    strong.textContent = parts.join(' + ');
+    activeFiltersLabel.appendChild(strong);
   }
 
   // ---------- Collapsible composer panel (mobile) ----------

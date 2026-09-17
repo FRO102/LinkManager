@@ -4,6 +4,7 @@ const express = require('express');
 const crypto = require('crypto');
 const { IMPORT_MAX_ITEMS } = require('../lib/config');
 const db = require('../lib/db');
+const { AppError } = require('../lib/errors');
 const {
   readNotes,
   getNoteById, insertNote, deleteNoteById, nextOrderValue,
@@ -59,10 +60,10 @@ router.get('/', (req, res) => {
 });
 
 // Reorder notes (drag-and-drop) — receives the list of IDs in the desired new order
-router.put('/reorder', (req, res) => {
+router.put('/reorder', (req, res, next) => {
   const { orderedIds } = req.body;
   if (!Array.isArray(orderedIds)) {
-    return res.status(400).json({ error: 'orderedIds must be an array of IDs' });
+    return next(new AppError('orderedIds must be an array of IDs', 400, 'INVALID_INPUT'));
   }
 
   const updateOrder = db.prepare('UPDATE notes SET "order" = ? WHERE id = ?');
@@ -75,13 +76,13 @@ router.put('/reorder', (req, res) => {
 });
 
 // Delete several notes in one call
-router.post('/bulk-delete', (req, res) => {
+router.post('/bulk-delete', (req, res, next) => {
   const { ids } = req.body;
   if (!Array.isArray(ids) || ids.length === 0) {
-    return res.status(400).json({ error: 'Request body must contain a non-empty "ids" array' });
+    return next(new AppError('Request body must contain a non-empty "ids" array', 400, 'INVALID_INPUT'));
   }
   if (ids.length > IMPORT_MAX_ITEMS) {
-    return res.status(400).json({ error: `Too many ids in one request (max ${IMPORT_MAX_ITEMS})` });
+    return next(new AppError(`Too many ids in one request (max ${IMPORT_MAX_ITEMS})`, 400, 'TOO_MANY_ITEMS'));
   }
 
   const txn = db.transaction((idList) => {
@@ -97,18 +98,18 @@ router.post('/bulk-delete', (req, res) => {
 });
 
 // Add and/or remove tags across several notes at once
-router.post('/bulk-tag', (req, res) => {
+router.post('/bulk-tag', (req, res, next) => {
   const { ids, addTags, removeTags } = req.body;
   if (!Array.isArray(ids) || ids.length === 0) {
-    return res.status(400).json({ error: 'Request body must contain a non-empty "ids" array' });
+    return next(new AppError('Request body must contain a non-empty "ids" array', 400, 'INVALID_INPUT'));
   }
   if (ids.length > IMPORT_MAX_ITEMS) {
-    return res.status(400).json({ error: `Too many ids in one request (max ${IMPORT_MAX_ITEMS})` });
+    return next(new AppError(`Too many ids in one request (max ${IMPORT_MAX_ITEMS})`, 400, 'TOO_MANY_ITEMS'));
   }
   const toAdd = Array.isArray(addTags) ? addTags.map(t => String(t).trim()).filter(Boolean) : [];
   const toRemove = Array.isArray(removeTags) ? new Set(removeTags.map(t => String(t).trim()).filter(Boolean)) : new Set();
   if (toAdd.length === 0 && toRemove.size === 0) {
-    return res.status(400).json({ error: 'Provide at least one of "addTags" or "removeTags"' });
+    return next(new AppError('Provide at least one of "addTags" or "removeTags"', 400, 'INVALID_INPUT'));
   }
 
   const updateTimestamp = db.prepare('UPDATE notes SET updated_at = ? WHERE id = ?');
@@ -132,18 +133,18 @@ router.post('/bulk-tag', (req, res) => {
 });
 
 // Get a specific note
-router.get('/:id', (req, res) => {
+router.get('/:id', (req, res, next) => {
   const note = getNoteById(req.params.id);
-  if (!note) return res.status(404).json({ error: 'Note not found' });
+  if (!note) return next(new AppError('Note not found', 404, 'NOT_FOUND'));
   res.json(note);
 });
 
 // Create a new note
-router.post('/', (req, res) => {
+router.post('/', (req, res, next) => {
   const { title, content, tags, favorite } = req.body;
 
   if (!title || !title.trim()) {
-    return res.status(400).json({ error: 'Title is required' });
+    return next(new AppError('Title is required', 400, 'INVALID_INPUT'));
   }
 
   const newNote = {
@@ -162,9 +163,9 @@ router.post('/', (req, res) => {
 });
 
 // Edit an existing note
-router.put('/:id', (req, res) => {
+router.put('/:id', (req, res, next) => {
   const existing = getNoteById(req.params.id);
-  if (!existing) return res.status(404).json({ error: 'Note not found' });
+  if (!existing) return next(new AppError('Note not found', 404, 'NOT_FOUND'));
 
   const { title, content, tags, favorite } = req.body;
 
@@ -172,7 +173,7 @@ router.put('/:id', (req, res) => {
   const values = [];
 
   if (title !== undefined) {
-    if (!title.trim()) return res.status(400).json({ error: 'Title is required' });
+    if (!title.trim()) return next(new AppError('Title is required', 400, 'INVALID_INPUT'));
     fields.push('title = ?');
     values.push(title.trim());
   }
@@ -201,9 +202,9 @@ router.put('/:id', (req, res) => {
 });
 
 // Delete a note
-router.delete('/:id', (req, res) => {
+router.delete('/:id', (req, res, next) => {
   const existing = getNoteById(req.params.id);
-  if (!existing) return res.status(404).json({ error: 'Note not found' });
+  if (!existing) return next(new AppError('Note not found', 404, 'NOT_FOUND'));
 
   deleteNoteById(req.params.id);
   res.json(existing);

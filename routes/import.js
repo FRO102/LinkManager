@@ -4,6 +4,7 @@ const express = require('express');
 const crypto = require('crypto');
 const { IMPORT_MAX_ITEMS } = require('../lib/config');
 const db = require('../lib/db');
+const { AppError } = require('../lib/errors');
 const { readLinks, insertLink, nextOrderValue } = require('../lib/persistence');
 const { isValidUrl } = require('../lib/ssrf-guard');
 const { normalizeUrlForCompare, parseBookmarksHtml } = require('../lib/url-utils');
@@ -11,18 +12,18 @@ const { normalizeUrlForCompare, parseBookmarksHtml } = require('../lib/url-utils
 const router = express.Router();
 
 // Import from HTML bookmarks (Netscape Bookmark format)
-router.post('/bookmarks', (req, res) => {
+router.post('/bookmarks', (req, res, next) => {
   const { html, defaultTags } = req.body;
   if (!html || typeof html !== 'string') {
-    return res.status(400).json({ error: 'Missing bookmarks HTML content' });
+    return next(new AppError('Missing bookmarks HTML content', 400, 'INVALID_INPUT'));
   }
 
   const parsed = parseBookmarksHtml(html);
   if (parsed.length === 0) {
-    return res.status(400).json({ error: 'No valid bookmarks found in the file' });
+    return next(new AppError('No valid bookmarks found in the file', 400, 'EMPTY_IMPORT'));
   }
   if (parsed.length > IMPORT_MAX_ITEMS) {
-    return res.status(400).json({ error: `Too many bookmarks in one file (max ${IMPORT_MAX_ITEMS} per import)` });
+    return next(new AppError(`Too many bookmarks in one file (max ${IMPORT_MAX_ITEMS} per import)`, 400, 'TOO_MANY_ITEMS'));
   }
 
   // Existing URLs are loaded once up front for duplicate-checking; only the
@@ -67,13 +68,13 @@ router.post('/bookmarks', (req, res) => {
 });
 
 // Import from a links.json file (from this app or another instance)
-router.post('/json', (req, res) => {
+router.post('/json', (req, res, next) => {
   const { items, defaultTags } = req.body;
   if (!Array.isArray(items)) {
-    return res.status(400).json({ error: 'Request body must contain an "items" array' });
+    return next(new AppError('Request body must contain an "items" array', 400, 'INVALID_INPUT'));
   }
   if (items.length > IMPORT_MAX_ITEMS) {
-    return res.status(400).json({ error: `Too many items in one import (max ${IMPORT_MAX_ITEMS} per import)` });
+    return next(new AppError(`Too many items in one import (max ${IMPORT_MAX_ITEMS} per import)`, 400, 'TOO_MANY_ITEMS'));
   }
 
   const existingUrls = new Set(readLinks().map(l => normalizeUrlForCompare(l.url)));

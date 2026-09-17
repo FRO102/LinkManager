@@ -8,7 +8,10 @@ const API = '/api/tasks';
 export async function apiList(params) {
   const query = params ? `?${new URLSearchParams(params)}` : '';
   const res = await fetch(`${API}${query}`);
-  if (!res.ok) throw new Error('Failed to load');
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error?.message || data.error || 'Failed to load');
+  }
   return res.json();
 }
 
@@ -19,7 +22,7 @@ export async function apiCreate(payload) {
     body: JSON.stringify(payload),
   });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Error creating task');
+  if (!res.ok) throw new Error(data.error?.message || data.error || 'Error creating task');
   return data;
 }
 
@@ -30,15 +33,15 @@ export async function apiUpdate(id, payload) {
     body: JSON.stringify(payload),
   });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Error updating task');
+  if (!res.ok) throw new Error(data.error?.message || data.error || 'Error updating task');
   return data;
 }
 
 export async function apiDelete(id) {
   const res = await fetch(`${API}/${id}`, { method: 'DELETE' });
   if (!res.ok) {
-    const data = await res.json();
-    throw new Error(data.error || 'Error removing task');
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error?.message || data.error || 'Error removing task');
   }
 }
 
@@ -49,7 +52,7 @@ export async function apiBulkDelete(ids) {
     body: JSON.stringify({ ids }),
   });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Error removing tasks');
+  if (!res.ok) throw new Error(data.error?.message || data.error || 'Error removing tasks');
   return data;
 }
 

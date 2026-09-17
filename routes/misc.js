@@ -2,6 +2,7 @@
 
 const express = require('express');
 const db = require('../lib/db');
+const { AppError } = require('../lib/errors');
 const { readLinks } = require('../lib/persistence');
 const { normalizeUrlForCompare } = require('../lib/url-utils');
 const { isValidUrl } = require('../lib/ssrf-guard');
@@ -45,14 +46,18 @@ router.get('/tags', (req, res) => {
 });
 
 // --- Preview (Open Graph) ---
-router.get('/preview', simpleRateLimit(30), async (req, res) => {
-  const { url } = req.query;
-  if (!url || !isValidUrl(url)) {
-    return res.status(400).json({ error: 'Invalid URL' });
+router.get('/preview', simpleRateLimit(30), async (req, res, next) => {
+  try {
+    const { url } = req.query;
+    if (!url || !isValidUrl(url)) {
+      throw new AppError('Invalid URL', 400, 'INVALID_URL');
+    }
+    const data = await getOgDataCached(url);
+    if (!data) throw new AppError('Could not fetch preview', 502, 'PREVIEW_FETCH_FAILED');
+    res.json(data);
+  } catch (err) {
+    next(err);
   }
-  const data = await getOgDataCached(url);
-  if (!data) return res.status(502).json({ error: 'Could not fetch preview' });
-  res.json(data);
 });
 
 // --- Statistics ---

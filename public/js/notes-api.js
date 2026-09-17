@@ -6,7 +6,10 @@ const API = '/api/notes';
 
 export async function apiList() {
   const res = await fetch(API);
-  if (!res.ok) throw new Error('Failed to load');
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error?.message || data.error || 'Failed to load');
+  }
   return res.json();
 }
 
@@ -17,7 +20,7 @@ export async function apiCreate(payload) {
     body: JSON.stringify(payload),
   });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Error creating note');
+  if (!res.ok) throw new Error(data.error?.message || data.error || 'Error creating note');
   return data;
 }
 
@@ -28,15 +31,15 @@ export async function apiUpdate(id, payload) {
     body: JSON.stringify(payload),
   });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Error updating note');
+  if (!res.ok) throw new Error(data.error?.message || data.error || 'Error updating note');
   return data;
 }
 
 export async function apiDelete(id) {
   const res = await fetch(`${API}/${id}`, { method: 'DELETE' });
   if (!res.ok) {
-    const data = await res.json();
-    throw new Error(data.error || 'Error removing note');
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error?.message || data.error || 'Error removing note');
   }
 }
 
@@ -47,7 +50,7 @@ export async function apiBulkDelete(ids) {
     body: JSON.stringify({ ids }),
   });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Error removing notes');
+  if (!res.ok) throw new Error(data.error?.message || data.error || 'Error removing notes');
   return data;
 }
 
@@ -57,7 +60,10 @@ export async function apiReorder(orderedIds) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ orderedIds }),
   });
-  if (!res.ok) throw new Error('Error saving new order');
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error?.message || data.error || 'Error saving new order');
+  }
 }
 
 export async function apiImportJson(items, defaultTags) {
@@ -67,12 +73,15 @@ export async function apiImportJson(items, defaultTags) {
     body: JSON.stringify({ items, defaultTags }),
   });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Error importing file');
+  if (!res.ok) throw new Error(data.error?.message || data.error || 'Error importing file');
   return data;
 }
 
 export async function apiStats() {
   const res = await fetch(`${API}/stats`);
-  if (!res.ok) throw new Error('Error fetching statistics');
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error?.message || data.error || 'Error fetching statistics');
+  }
   return res.json();
 }

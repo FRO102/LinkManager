@@ -4,6 +4,7 @@ const express = require('express');
 const crypto = require('crypto');
 const { IMPORT_MAX_ITEMS } = require('../lib/config');
 const db = require('../lib/db');
+const { AppError } = require('../lib/errors');
 const {
   readLinks,
   getLinkById, insertLink, deleteLinkById, nextOrderValue,
@@ -76,9 +77,9 @@ router.get('/', (req, res) => {
 });
 
 // Check whether a URL already exists in the collection (duplicate detection)
-router.get('/check-duplicate', (req, res) => {
+router.get('/check-duplicate', (req, res, next) => {
   const { url, excludeId } = req.query;
-  if (!url) return res.status(400).json({ error: 'Missing url parameter' });
+  if (!url) return next(new AppError('Missing url parameter', 400, 'INVALID_INPUT'));
 
   const links = readLinks();
   const normalized = normalizeUrlForCompare(url);
@@ -93,30 +94,30 @@ router.get('/check-status', (req, res) => {
 });
 
 // Check all links (can take a while — runs in batches)
-router.post('/check-all', simpleRateLimit(5), async (req, res) => {
+router.post('/check-all', simpleRateLimit(5), async (req, res, next) => {
   try {
     const links = await runCheckAll();
     res.json({ checked: links.length, links });
   } catch (err) {
     if (err.code === 'ALREADY_IN_PROGRESS') {
-      return res.status(409).json({ error: err.message });
+      return next(new AppError(err.message, 409, 'ALREADY_IN_PROGRESS'));
     }
-    res.status(500).json({ error: 'Error checking links' });
+    next(new AppError('Error checking links', 500, 'CHECK_FAILED'));
   }
 });
 
 // Cancel an in-progress check-all run (must come before /:id/check)
-router.post('/check-all/cancel', (req, res) => {
+router.post('/check-all/cancel', (req, res, next) => {
   const cancelled = cancelCheckAll();
-  if (!cancelled) return res.status(409).json({ error: 'No check is currently in progress' });
+  if (!cancelled) return next(new AppError('No check is currently in progress', 409, 'NO_CHECK_IN_PROGRESS'));
   res.json({ success: true });
 });
 
 // Reorder links (drag-and-drop) — receives the list of IDs in the desired new order
-router.put('/reorder', (req, res) => {
+router.put('/reorder', (req, res, next) => {
   const { orderedIds } = req.body;
   if (!Array.isArray(orderedIds)) {
-    return res.status(400).json({ error: 'orderedIds must be an array of IDs' });
+    return next(new AppError('orderedIds must be an array of IDs', 400, 'INVALID_INPUT'));
   }
 
   const updateOrder = db.prepare('UPDATE links SET "order" = ? WHERE id = ?');
@@ -130,13 +131,13 @@ router.put('/reorder', (req, res) => {
 
 // Delete several links in one call (e.g. clearing out a duplicate group, or a
 // multi-select in the UI) instead of the client firing one DELETE per id.
-router.post('/bulk-delete', (req, res) => {
+router.post('/bulk-delete', (req, res, next) => {
   const { ids } = req.body;
   if (!Array.isArray(ids) || ids.length === 0) {
-    return res.status(400).json({ error: 'Request body must contain a non-empty "ids" array' });
+    return next(new AppError('Request body must contain a non-empty "ids" array', 400, 'INVALID_INPUT'));
   }
   if (ids.length > IMPORT_MAX_ITEMS) {
-    return res.status(400).json({ error: `Too many ids in one request (max ${IMPORT_MAX_ITEMS})` });
+    return next(new AppError(`Too many ids in one request (max ${IMPORT_MAX_ITEMS})`, 400, 'TOO_MANY_ITEMS'));
   }
 
   const txn = db.transaction((idList) => {
@@ -153,18 +154,18 @@ router.post('/bulk-delete', (req, res) => {
 
 // Add and/or remove tags across several links at once (e.g. tagging a batch
 // of imported links, or cleaning up a tag name across the whole collection).
-router.post('/bulk-tag', (req, res) => {
+router.post('/bulk-tag', (req, res, next) => {
   const { ids, addTags, removeTags } = req.body;
   if (!Array.isArray(ids) || ids.length === 0) {
-    return res.status(400).json({ error: 'Request body must contain a non-empty "ids" array' });
+    return next(new AppError('Request body must contain a non-empty "ids" array', 400, 'INVALID_INPUT'));
   }
   if (ids.length > IMPORT_MAX_ITEMS) {
-    return res.status(400).json({ error: `Too many ids in one request (max ${IMPORT_MAX_ITEMS})` });
+    return next(new AppError(`Too many ids in one request (max ${IMPORT_MAX_ITEMS})`, 400, 'TOO_MANY_ITEMS'));
   }
   const toAdd = Array.isArray(addTags) ? addTags.map(t => String(t).trim()).filter(Boolean) : [];
   const toRemove = Array.isArray(removeTags) ? new Set(removeTags.map(t => String(t).trim()).filter(Boolean)) : new Set();
   if (toAdd.length === 0 && toRemove.size === 0) {
-    return res.status(400).json({ error: 'Provide at least one of "addTags" or "removeTags"' });
+    return next(new AppError('Provide at least one of "addTags" or "removeTags"', 400, 'INVALID_INPUT'));
   }
 
   const updateTimestamp = db.prepare('UPDATE links SET updated_at = ? WHERE id = ?');
@@ -188,35 +189,39 @@ router.post('/bulk-tag', (req, res) => {
 });
 
 // Get a specific link
-router.get('/:id', (req, res) => {
+router.get('/:id', (req, res, next) => {
   const link = getLinkById(req.params.id);
-  if (!link) return res.status(404).json({ error: 'Link not found' });
+  if (!link) return next(new AppError('Link not found', 404, 'NOT_FOUND'));
   res.json(link);
 });
 
 // Check a single link (must come after /check-all and /check-status to avoid collision)
-router.post('/:id/check', async (req, res) => {
-  const link = getLinkById(req.params.id);
-  if (!link) return res.status(404).json({ error: 'Link not found' });
+router.post('/:id/check', async (req, res, next) => {
+  try {
+    const link = getLinkById(req.params.id);
+    if (!link) throw new AppError('Link not found', 404, 'NOT_FOUND');
 
-  const result = await checkLinkStatus(link.url);
-  db.prepare(`
-    UPDATE links SET link_status = ?, link_status_code = ?, link_status_error = ?, last_checked_at = ?
-    WHERE id = ?
-  `).run(result.status, result.statusCode, result.error || null, result.checkedAt, req.params.id);
+    const result = await checkLinkStatus(link.url);
+    db.prepare(`
+      UPDATE links SET link_status = ?, link_status_code = ?, link_status_error = ?, last_checked_at = ?
+      WHERE id = ?
+    `).run(result.status, result.statusCode, result.error || null, result.checkedAt, req.params.id);
 
-  res.json(getLinkById(req.params.id));
+    res.json(getLinkById(req.params.id));
+  } catch (err) {
+    next(err);
+  }
 });
 
 // Create a new link
-router.post('/', (req, res) => {
+router.post('/', (req, res, next) => {
   const { title, url, description, tags, favorite } = req.body;
 
   if (!title || !title.trim()) {
-    return res.status(400).json({ error: 'Title is required' });
+    return next(new AppError('Title is required', 400, 'INVALID_INPUT'));
   }
   if (!url || !isValidUrl(url)) {
-    return res.status(400).json({ error: 'Invalid URL. Use http:// or https://' });
+    return next(new AppError('Invalid URL. Use http:// or https://', 400, 'INVALID_URL'));
   }
 
   const newLink = {
@@ -240,9 +245,9 @@ router.post('/', (req, res) => {
 });
 
 // Edit an existing link
-router.put('/:id', (req, res) => {
+router.put('/:id', (req, res, next) => {
   const existing = getLinkById(req.params.id);
-  if (!existing) return res.status(404).json({ error: 'Link not found' });
+  if (!existing) return next(new AppError('Link not found', 404, 'NOT_FOUND'));
 
   const { title, url, description, tags, favorite } = req.body;
 
@@ -250,12 +255,12 @@ router.put('/:id', (req, res) => {
   const values = [];
 
   if (title !== undefined) {
-    if (!title.trim()) return res.status(400).json({ error: 'Title is required' });
+    if (!title.trim()) return next(new AppError('Title is required', 400, 'INVALID_INPUT'));
     fields.push('title = ?');
     values.push(title.trim());
   }
   if (url !== undefined) {
-    if (!isValidUrl(url)) return res.status(400).json({ error: 'Invalid URL. Use http:// or https://' });
+    if (!isValidUrl(url)) return next(new AppError('Invalid URL. Use http:// or https://', 400, 'INVALID_URL'));
     fields.push('url = ?', 'link_status = NULL', 'link_status_code = NULL', 'link_status_error = NULL', 'last_checked_at = NULL');
     values.push(url.trim());
   }

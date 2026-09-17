@@ -4,6 +4,7 @@ const express = require('express');
 const crypto = require('crypto');
 const { IMPORT_MAX_ITEMS } = require('../lib/config');
 const db = require('../lib/db');
+const { AppError } = require('../lib/errors');
 const {
   readTasks,
   getTaskById, insertTask, deleteTaskById, nextOrderValue,
@@ -76,13 +77,13 @@ router.get('/', (req, res) => {
 });
 
 // Delete several tasks in one call (e.g. "clear completed")
-router.post('/bulk-delete', (req, res) => {
+router.post('/bulk-delete', (req, res, next) => {
   const { ids } = req.body;
   if (!Array.isArray(ids) || ids.length === 0) {
-    return res.status(400).json({ error: 'Request body must contain a non-empty "ids" array' });
+    return next(new AppError('Request body must contain a non-empty "ids" array', 400, 'INVALID_INPUT'));
   }
   if (ids.length > IMPORT_MAX_ITEMS) {
-    return res.status(400).json({ error: `Too many ids in one request (max ${IMPORT_MAX_ITEMS})` });
+    return next(new AppError(`Too many ids in one request (max ${IMPORT_MAX_ITEMS})`, 400, 'TOO_MANY_ITEMS'));
   }
 
   const txn = db.transaction((idList) => {
@@ -98,21 +99,21 @@ router.post('/bulk-delete', (req, res) => {
 });
 
 // Get a specific task
-router.get('/:id', (req, res) => {
+router.get('/:id', (req, res, next) => {
   const task = getTaskById(req.params.id);
-  if (!task) return res.status(404).json({ error: 'Task not found' });
+  if (!task) return next(new AppError('Task not found', 404, 'NOT_FOUND'));
   res.json(task);
 });
 
 // Create a new task
-router.post('/', (req, res) => {
+router.post('/', (req, res, next) => {
   const { title, description, dueDate, completed } = req.body;
 
   if (!title || !title.trim()) {
-    return res.status(400).json({ error: 'Title is required' });
+    return next(new AppError('Title is required', 400, 'INVALID_INPUT'));
   }
   if (dueDate !== undefined && dueDate !== null && dueDate !== '' && !isValidDueDate(dueDate)) {
-    return res.status(400).json({ error: 'dueDate must be in YYYY-MM-DD format' });
+    return next(new AppError('dueDate must be in YYYY-MM-DD format', 400, 'INVALID_INPUT'));
   }
 
   const newTask = {
@@ -131,9 +132,9 @@ router.post('/', (req, res) => {
 });
 
 // Edit an existing task (also used to toggle `completed`)
-router.put('/:id', (req, res) => {
+router.put('/:id', (req, res, next) => {
   const existing = getTaskById(req.params.id);
-  if (!existing) return res.status(404).json({ error: 'Task not found' });
+  if (!existing) return next(new AppError('Task not found', 404, 'NOT_FOUND'));
 
   const { title, description, dueDate, completed } = req.body;
 
@@ -141,7 +142,7 @@ router.put('/:id', (req, res) => {
   const values = [];
 
   if (title !== undefined) {
-    if (!title.trim()) return res.status(400).json({ error: 'Title is required' });
+    if (!title.trim()) return next(new AppError('Title is required', 400, 'INVALID_INPUT'));
     fields.push('title = ?');
     values.push(title.trim());
   }
@@ -151,7 +152,7 @@ router.put('/:id', (req, res) => {
   }
   if (dueDate !== undefined) {
     if (dueDate !== null && dueDate !== '' && !isValidDueDate(dueDate)) {
-      return res.status(400).json({ error: 'dueDate must be in YYYY-MM-DD format' });
+      return next(new AppError('dueDate must be in YYYY-MM-DD format', 400, 'INVALID_INPUT'));
     }
     fields.push('due_date = ?');
     values.push(dueDate || null);
