@@ -14,6 +14,12 @@ The project also includes integrated **Notes** (freeform documentation) and **Ta
 ---
 
 ## 🚀 Quick Start
+Prerequisite: Docker and Docker Compose installed.
+```bash
+sudo curl -fsSL https://get.docker.com | sh
+sudo systemctl enable --now docker
+sudo usermod -aG docker $USER
+```
 
 ### Using Docker (Recommended)
 ```bash
