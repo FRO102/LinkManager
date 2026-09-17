@@ -8,7 +8,7 @@ const { AppError } = require('../lib/errors');
 const {
   readLinks,
   getLinkById, insertLink, deleteLinkById, nextOrderValue,
-  setTagsForLink,
+  setTagsForLink, renameTag, deleteTag, getAllTags,
 } = require('../lib/persistence');
 const { isValidUrl } = require('../lib/ssrf-guard');
 const { normalizeUrlForCompare } = require('../lib/url-utils');
@@ -74,6 +74,47 @@ router.get('/', (req, res) => {
   }
 
   res.json(links);
+});
+
+// List all unique tags and their usage counts
+router.get('/tags', (req, res) => {
+  try {
+    const tags = getAllTags();
+    res.json(tags);
+  } catch (err) {
+    res.status(500).json({ error: 'Could not fetch tags' });
+  }
+});
+
+// Rename a tag globally
+router.patch('/tags/:name', (req, res, next) => {
+  const { name } = req.params;
+  const { newName } = req.body;
+
+  if (!newName || !newName.trim()) {
+    return next(new AppError('New name is required', 400, 'INVALID_INPUT'));
+  }
+
+  try {
+    const success = renameTag(name, newName.trim());
+    if (!success) return next(new AppError('Tag not found', 404, 'NOT_FOUND'));
+    res.json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Delete a tag globally
+router.delete('/tags/:name', (req, res, next) => {
+  const { name } = req.params;
+
+  try {
+    const success = deleteTag(name);
+    if (!success) return next(new AppError('Tag not found', 404, 'NOT_FOUND'));
+    res.json({ success: true });
+  } catch (err) {
+    next(err);
+  }
 });
 
 // Check whether a URL already exists in the collection (duplicate detection)

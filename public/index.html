@@ -24,7 +24,7 @@
       <span class="status-dot"></span>
       <span class="status-label">Connected to server</span>
     </span>
-    <div class="file-buttons" role="group" aria-label="Page controls">
+    <nav class="file-buttons" aria-label="Main Navigation">
       <a class="btn btn-primary" href="index.html" title="Nodes">Nodes</a>
       <a class="btn btn-ghost" href="notes.html" title="Go to Notes">Notes</a>
       <a class="btn btn-ghost" href="tasks.html" title="Go to Tasks">Tasks</a>
@@ -35,13 +35,14 @@
         </button>
         <div class="overflow-menu hidden" id="moreMenu" role="menu">
           <button class="overflow-menu-item" id="btnStats" role="menuitem" title="View collection statistics">Statistics</button>
+          <button class="overflow-menu-item" id="btnManageTags" role="menuitem" title="Rename or delete tags globally">Manage Tags</button>
           <button class="overflow-menu-item" id="btnDuplicates" role="menuitem" title="View duplicate nodes">Duplicates</button>
           <button class="overflow-menu-item" id="btnCheckLinks" role="menuitem" title="Check all links now">Check links</button>
           <button class="overflow-menu-item" id="btnImport" role="menuitem" title="Import bookmarks or links.json">Import</button>
           <button class="overflow-menu-item" id="btnExport" role="menuitem" title="Download a copy as links.json">Export .json</button>
         </div>
       </div>
-      <button class="btn btn-ghost" id="btnToggleTheme" title="Toggle theme">🌗</button>
+      <button class="btn btn-ghost" id="btnToggleTheme" title="Toggle theme" aria-label="Toggle theme">🌗</button>
     </div>
   </div>
 </header>
@@ -69,7 +70,9 @@
 
       <div class="field">
         <label for="inputTags">Tags</label>
-        <input type="text" id="inputTags" name="tags" placeholder="work, reading, tool (comma-separated)">
+        <div class="tag-composer" id="tagComposer">
+          <input type="text" id="inputTags" name="tags" placeholder="work, reading, tool (comma-separated)">
+        </div>
       </div>
 
       <div class="field field-notes">
@@ -103,7 +106,7 @@
 
       <div class="toolbar">
         <div class="toolbar-row toolbar-row-search">
-          <input type="search" id="searchInput" class="search-input" placeholder="Search title, URL, tag, or note…">
+          <input type="search" id="searchInput" class="search-input" placeholder="Search title, URL, tag, or note…" aria-label="Search nodes">
         </div>
 
         <div class="toolbar-row toolbar-row-filters">
@@ -227,6 +230,19 @@
     </div>
     <div id="statsContent" class="stats-content">
       <p class="import-hint">Loading…</p>
+    </div>
+  </div>
+</div>
+
+<!-- Tag management modal -->
+<div id="tagsOverlay" class="confirm-overlay hidden">
+  <div class="confirm-box modal-box" role="dialog" aria-modal="true" aria-labelledby="tagsTitle">
+    <div class="modal-box-header">
+      <h3 id="tagsTitle">Manage Tags</h3>
+      <button class="btn-icon-close" id="tagsClose" aria-label="Close">✕</button>
+    </div>
+    <div id="tagsContent" class="tags-manage-content">
+      <p class="import-hint">Loading tags…</p>
     </div>
   </div>
 </div>

@@ -31,6 +31,7 @@ import {
 
   let activeTagFilters = new Set();
   let tagFilterMode = 'or'; // 'or' = any selected tag; 'and' = all
+  let tagExclusionMode = false; // false = include, true = exclude
   let searchTerm = '';
   let sortMode = 'recent';
   let viewMode = 'list';
@@ -79,6 +80,7 @@ import {
   const btnImport       = $('#btnImport');
   const btnStats        = $('#btnStats');
   const btnDuplicates   = $('#btnDuplicates');
+  const btnManageTags    = $('#btnManageTags');
   const btnCheckLinks   = $('#btnCheckLinks');
   const btnMoreMenu     = $('#btnMoreMenu');
   const moreMenu        = $('#moreMenu');
@@ -118,6 +120,10 @@ import {
   const statsClose      = $('#statsClose');
   const statsContent    = $('#statsContent');
 
+  const tagsOverlay     = $('#tagsOverlay');
+  const tagsClose       = $('#tagsClose');
+  const tagsContent     = $('#tagsContent');
+
   const duplicatesOverlay = $('#duplicatesOverlay');
   const duplicatesClose = $('#duplicatesClose');
   const duplicatesContent = $('#duplicatesContent');
@@ -130,10 +136,123 @@ import {
   const previewDescription = $('#previewDescription');
   const previewEmpty    = $('#previewEmpty');
 
-  // ---------- Utilities ----------
-  // escapeHtml, normalizeUrl, faviconFor, hostnameFor, formatDate, timeAgo
-  // now live in js/utils.js (imported above). showToast and setStatus stay
-  // here since they close over local DOM refs (toastEl, fileStatus).
+  // ---------- Tag Composer ----------
+
+  function setupTagComposer() {
+    const composer = $('#tagComposer');
+    if (!composer) return;
+
+    const input = composer.querySelector('input');
+    let currentTags = new Set();
+
+    function renderPills() {
+      // Remove existing pills
+      composer.querySelectorAll('.tag-pill').forEach(p => p.remove());
+
+      // Add pills for current tags
+      currentTags.forEach(tag => {
+        const pill = document.createElement('span');
+        pill.className = 'tag-pill';
+        pill.innerHTML = `${tag}<button type="button" class="remove-tag" title="Remove tag" aria-label="Remove tag ${escapeHtml(tag)}">✕</button>`;
+        pill.querySelector('.remove-tag').addEventListener('click', (e) => {
+          e.stopPropagation();
+          currentTags.delete(tag);
+          updateInput();
+          renderPills();
+        });
+        composer.insertBefore(pill, input);
+      });
+    }
+
+    function updateInput() {
+      input.value = Array.from(currentTags).join(', ');
+    }
+
+    function showSuggestions(term) {
+      // Remove old suggestions
+      const existing = document.querySelector('.tag-suggestions');
+      if (existing) existing.remove();
+
+      if (!term) return;
+
+      fetch('/api/links/tags')
+        .then(res => res.json())
+        .then(tags => {
+          const filtered = tags.filter(t => t.name.toLowerCase().includes(term.toLowerCase()));
+          if (filtered.length === 0) return;
+
+          const sugBox = document.createElement('div');
+          sugBox.className = 'tag-suggestions';
+
+          // Position the box relative to the composer
+          const rect = composer.getBoundingClientRect();
+          sugBox.style.left = `${rect.left}px`;
+          sugBox.style.top = `${rect.bottom + 4}px`;
+
+          filtered.forEach(tag => {
+            const item = document.createElement('div');
+            item.className = 'tag-suggestion-item';
+            item.innerHTML = `${tag.name} <span class="tag-suggestion-count">${tag.usageCount}</span>`;
+            item.addEventListener('click', (e) => {
+              e.stopPropagation();
+              addTag(tag.name);
+              sugBox.remove();
+            });
+            sugBox.appendChild(item);
+          });
+
+          document.body.appendChild(sugBox);
+
+          // Close suggestions when clicking outside
+          const closeSuggestions = (e) => {
+            if (!sugBox.contains(e.target) && e.target !== input) {
+              sugBox.remove();
+              document.removeEventListener('click', closeSuggestions);
+            }
+          };
+          document.addEventListener('click', closeSuggestions);
+        })
+        .catch(() => {});
+    }
+
+    function addTag(tag) {
+      const trimmed = tag.trim();
+      if (trimmed && !currentTags.has(trimmed)) {
+        currentTags.add(trimmed);
+        updateInput();
+        renderPills();
+      }
+    }
+
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        addTag(input.value);
+        input.value = '';
+      } else if (e.key === ',') {
+        e.preventDefault();
+        addTag(input.value);
+        input.value = '';
+      }
+    });
+
+    input.addEventListener('input', (e) => {
+      const term = e.target.value.trim();
+      showSuggestions(term);
+    });
+
+    // Expose methods for edit mode
+    composer.setTags = (tags) => {
+      currentTags = new Set(tags);
+      updateInput();
+      renderPills();
+    };
+    composer.clear = () => {
+      currentTags.clear();
+      updateInput();
+      renderPills();
+    };
+  }
 
   function showToast(message, type = 'default') {
     toastEl.textContent = message;
@@ -177,7 +296,13 @@ import {
     editingIdInput.value = link.id;
     inputUrl.value = link.url;
     inputTitle.value = link.title;
-    inputTags.value = (link.tags || []).join(', ');
+
+    if ($('#tagComposer')) {
+      $('#tagComposer').setTags(link.tags || []);
+    } else {
+      inputTags.value = (link.tags || []).join(', ');
+    }
+
     inputNotes.value = link.description || '';
     inputFavorite.checked = !!link.favorite;
     composerTitle.textContent = '01 — Edit node';
@@ -196,6 +321,9 @@ import {
     editingId = null;
     editingIdInput.value = '';
     form.reset();
+    if ($('#tagComposer')) {
+      $('#tagComposer').clear();
+    }
     composerTitle.textContent = '01 — Add node';
     btnSubmit.textContent = 'Save node';
     btnCancelEdit.classList.add('hidden');
@@ -431,6 +559,20 @@ import {
     }
 
     if (activeTagFilters.size > 0) {
+      const excludeBtn = document.createElement('button');
+      excludeBtn.type = 'button';
+      excludeBtn.className = 'tag-exclude-btn' + (tagExclusionMode ? ' active' : '');
+      excludeBtn.textContent = tagExclusionMode ? 'Exclude tags' : 'Include tags';
+      excludeBtn.title = tagExclusionMode
+        ? 'Currently hiding nodes with these tags — click to show them instead'
+        : 'Currently showing nodes with these tags — click to hide them instead';
+      excludeBtn.addEventListener('click', () => {
+        tagExclusionMode = !tagExclusionMode;
+        renderTagFilters();
+        resetPaginationAndRender();
+      });
+      filterTagsEl.appendChild(excludeBtn);
+
       const clearBtn = document.createElement('button');
       clearBtn.type = 'button';
       clearBtn.className = 'tag-clear-btn';
@@ -438,6 +580,7 @@ import {
       clearBtn.textContent = '✕ clear';
       clearBtn.addEventListener('click', () => {
         activeTagFilters.clear();
+        tagExclusionMode = false;
         renderTagFilters();
         resetPaginationAndRender();
       });
@@ -498,6 +641,11 @@ import {
     if (activeTagFilters.size > 0) {
       list = list.filter(l => {
         const tags = l.tags || [];
+        if (tagExclusionMode) {
+          // Exclude mode: hide if the link has ANY of the selected tags
+          return !Array.from(activeTagFilters).some(t => tags.includes(t));
+        }
+        // Include mode: existing AND/OR logic
         return tagFilterMode === 'and'
           ? Array.from(activeTagFilters).every(t => tags.includes(t))
           : Array.from(activeTagFilters).some(t => tags.includes(t));
@@ -789,6 +937,7 @@ import {
       else if (!statsOverlay.classList.contains('hidden')) closeStatsModal();
       else if (!duplicatesOverlay.classList.contains('hidden')) closeDuplicatesModal();
       else if (isComposerCollapsible() && composerPanel.classList.contains('is-open')) closeComposerPanel();
+      else if (tagsOverlay && !tagsOverlay.classList.contains('hidden')) closeTagsModal();
     }
     if (e.key === '/' &&
         document.activeElement !== inputUrl &&
@@ -1374,6 +1523,93 @@ import {
     }
   });
 
+  async function openTagsModal() {
+    tagsOverlay.classList.remove('hidden');
+    tagsContent.innerHTML = '<p class="import-hint">Loading tags…</p>';
+    trapFocus(document.querySelector('#tagsOverlay .confirm-box'));
+    try {
+      const res = await fetch('/api/links/tags');
+      const tags = await res.json();
+      renderTagsManagementList(tags);
+    } catch (err) {
+      tagsContent.innerHTML = `<p class="form-error">${err.message}</p>`;
+    }
+  }
+
+  function closeTagsModal() {
+    tagsOverlay.classList.add('hidden');
+    releaseFocusTrap();
+  }
+
+  function renderTagsManagementList(tags) {
+    tagsContent.innerHTML = '';
+    if (tags.length === 0) {
+      tagsContent.innerHTML = '<p class="import-hint">No tags found in the collection.</p>';
+      return;
+    }
+
+    tags.forEach(tag => {
+      const row = document.createElement('div');
+      row.className = 'tag-manage-row';
+
+      const info = document.createElement('div');
+      info.className = 'tag-manage-info';
+      info.innerHTML = `<span>${escapeHtml(tag.name)}</span><span class="tag-manage-count">${tag.usageCount}</span>`;
+
+      const actions = document.createElement('div');
+      actions.className = 'tag-manage-actions';
+
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'tag-manage-input';
+      input.value = tag.name;
+      input.title = 'New name';
+
+      const renameBtn = document.createElement('button');
+      renameBtn.className = 'btn btn-ghost btn-small';
+      renameBtn.textContent = 'Rename';
+      renameBtn.addEventListener('click', async () => {
+        const newName = input.value.trim();
+        if (!newName || newName === tag.name) return;
+        try {
+          await fetch(`/api/links/tags/${encodeURIComponent(tag.name)}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ newName })
+          });
+          showToast(`Tag "${tag.name}" renamed to "${newName}"`, 'success');
+          await refresh();
+          openTagsModal();
+        } catch (err) {
+          showToast(err.message, 'error');
+        }
+      });
+
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'btn btn-ghost btn-small danger';
+      deleteBtn.textContent = 'Delete';
+      deleteBtn.addEventListener('click', async () => {
+        if (!confirm(`Are you sure you want to delete the tag "${tag.name}"? All links using this tag will lose it.`)) return;
+        try {
+          await fetch(`/api/links/tags/${encodeURIComponent(tag.name)}`, { method: 'DELETE' });
+          showToast(`Tag "${tag.name}" deleted`, 'success');
+          await refresh();
+          openTagsModal();
+        } catch (err) {
+          showToast(err.message, 'error');
+        }
+      });
+
+      actions.appendChild(input);
+      actions.appendChild(renameBtn);
+      actions.appendChild(deleteBtn);
+
+      row.appendChild(info);
+      row.appendChild(actions);
+      tagsContent.appendChild(row);
+    });
+  }
+
   // ---------- Overflow "More actions" menu ----------
 
   function openMoreMenu() {
@@ -1403,6 +1639,10 @@ import {
       if (e.key === 'Escape') closeMoreMenu();
     });
   }
+
+  btnManageTags.addEventListener('click', () => { closeMoreMenu(); openTagsModal(); });
+  tagsClose.addEventListener('click', closeTagsModal);
+  tagsOverlay.addEventListener('click', (e) => { if (e.target === tagsOverlay) closeTagsModal(); });
 
   // ---------- "More tags" popover ----------
 

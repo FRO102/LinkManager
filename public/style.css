@@ -9,12 +9,12 @@
   --paper:        #EDEAE2;
   --paper-raised: #F7F5EF;
   --ink:          #1F2421;
-  --ink-soft:     #565F5A;
+  --ink-soft:     #4A524D;
   --line:         #C9C3B3;
   --indigo:       #2F3E63;
   --indigo-soft:  #5A6B96;
   --copper:       #9C4E20;
-  --copper-soft:  #E4B48C;
+  --copper-soft:  #A06D45;
   --good:         #3E6B4F;
   --danger:       #A8402C;
   --danger-tint:  #F3E2DD;
@@ -468,6 +468,83 @@ button, input, textarea, select{
   border-color: var(--indigo-soft);
 }
 
+/* Tag Composer */
+.tag-composer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 12px;
+  background: var(--paper-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  transition: border-color 0.12s ease;
+  align-items: center;
+}
+.tag-composer:focus-within {
+  border-color: var(--indigo-soft);
+  outline: none;
+}
+.tag-composer input {
+  border: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+  flex: 1 1 100px;
+  min-width: 60px;
+  font-size: 14px;
+  color: var(--ink);
+  outline: none !important;
+}
+.tag-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--indigo);
+  color: #F7F5EF;
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  user-select: none;
+}
+.tag-pill .remove-tag {
+  cursor: pointer;
+  font-weight: bold;
+  opacity: 0.7;
+  transition: opacity 0.1s ease;
+}
+.tag-pill .remove-tag:hover {
+  opacity: 1;
+}
+.tag-suggestions {
+  position: absolute;
+  z-index: 100;
+  background: var(--paper-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px -8px rgba(0,0,0,0.2);
+  max-height: 200px;
+  overflow-y: auto;
+  width: 240px;
+}
+.tag-suggestion-item {
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 13px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.tag-suggestion-item:hover,
+.tag-suggestion-item.selected {
+  background: var(--paper);
+  color: var(--indigo);
+}
+.tag-suggestion-count {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  opacity: 0.6;
+}
+
 .field textarea{ resize: vertical; min-height: 44px; }
 
 /* The notes page's content textarea (rows="14") is a small editor rather
@@ -740,7 +817,8 @@ button, input, textarea, select{
 }
 
 .tag-mode-btn,
-.tag-clear-btn{
+.tag-clear-btn,
+.tag-exclude-btn{
   font-family: var(--font-mono);
   font-size: 11px;
   padding: 5px 10px;
@@ -760,6 +838,19 @@ button, input, textarea, select{
   background: var(--copper);
   border-color: var(--copper);
   color: #F7F5EF;
+}
+.tag-exclude-btn{
+  border-style: solid;
+  border-color: var(--line);
+}
+.tag-exclude-btn.active{
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #F7F5EF;
+}
+.tag-exclude-btn:hover:not(.active){
+  border-color: var(--danger);
+  color: var(--danger);
 }
 .tag-clear-btn:hover{
   border-color: var(--danger);
@@ -1792,6 +1883,63 @@ select:focus-visible{
 .task-show-overdue{
   font-size: 12.5px;
   white-space: nowrap;
+}
+
+/* Tag Management Modal */
+.tags-manage-content {
+  max-height: 60vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tag-manage-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  transition: border-color 0.12s ease;
+}
+
+.tag-manage-row:hover {
+  border-color: var(--indigo-soft);
+}
+
+.tag-manage-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.tag-manage-count {
+  font-size: 10px;
+  opacity: 0.6;
+  background: var(--paper-raised);
+  padding: 1px 5px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+}
+
+.tag-manage-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.tag-manage-input {
+  font-family: var(--font-body);
+  font-size: 13px;
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper-raised);
+  width: 120px;
 }
 
 /* ---------- Reduced motion ---------- */
