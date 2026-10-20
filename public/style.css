@@ -1930,7 +1930,7 @@ select:focus-visible{
 
 .tags-manage-grid-header {
   display: grid;
-  grid-template-columns: 1fr auto auto;
+  grid-template-columns: 1fr 80px 220px;
   gap: 12px;
   padding: 8px 12px;
   font-family: var(--font-mono);
@@ -1949,7 +1949,7 @@ select:focus-visible{
 
 .tag-manage-row {
   display: grid;
-  grid-template-columns: 1fr auto auto;
+  grid-template-columns: 1fr 80px 220px;
   align-items: center;
   gap: 12px;
   padding: 8px 12px;
@@ -1989,7 +1989,7 @@ select:focus-visible{
   gap: 6px;
   align-items: center;
   justify-content: flex-end;
-  width: 200px;
+  width: 100%;
 }
 
 .tag-manage-input {
